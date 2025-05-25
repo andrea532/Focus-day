@@ -1,9 +1,11 @@
 import React, { useState, createContext, useEffect } from 'react';
+import * as db from '../services/db';
 
 export const AppContext = createContext(null);
 
 export const AppProvider = ({ children }) => {
   // Stati principali
+  const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard');
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [lastPaydayDate, setLastPaydayDate] = useState('');
@@ -81,6 +83,110 @@ export const AppProvider = ({ children }) => {
     textSecondary: userSettings.darkMode ? '#A0A3BD' : '#757F8C',
     border: userSettings.darkMode ? '#3A3B43' : '#E3E8F1',
   };
+
+  // Carica i dati dal database all'avvio
+  useEffect(() => {
+    const loadDataFromDB = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Carica le impostazioni
+        const savedSettings = await db.getSettings();
+        if (savedSettings && savedSettings.length > 0) {
+          const settings = savedSettings[0];
+          
+          // Carica tutti i dati dalle impostazioni salvate
+          if (settings.monthlyIncome !== undefined) setMonthlyIncome(settings.monthlyIncome);
+          if (settings.lastPaydayDate) setLastPaydayDate(settings.lastPaydayDate);
+          if (settings.nextPaydayDate) setNextPaydayDate(settings.nextPaydayDate);
+          if (settings.paymentType) setPaymentType(settings.paymentType);
+          if (settings.customStartDate) setCustomStartDate(settings.customStartDate);
+          if (settings.customEndDate) setCustomEndDate(settings.customEndDate);
+          if (settings.savingsMode) setSavingsMode(settings.savingsMode);
+          if (settings.savingsPeriod) setSavingsPeriod(settings.savingsPeriod);
+          if (settings.savingsPercentage !== undefined) setSavingsPercentage(settings.savingsPercentage);
+          if (settings.savingsFixedAmount !== undefined) setSavingsFixedAmount(settings.savingsFixedAmount);
+          if (settings.savingsStartDate) setSavingsStartDate(settings.savingsStartDate);
+          if (settings.savingsEndDate) setSavingsEndDate(settings.savingsEndDate);
+          if (settings.userSettings) setUserSettings(settings.userSettings);
+          if (settings.streak !== undefined) setStreak(settings.streak);
+          if (settings.achievements) setAchievements(settings.achievements);
+        }
+        
+        // Carica le transazioni
+        const savedTransactions = await db.getTransactions();
+        if (savedTransactions) {
+          setTransactions(savedTransactions);
+        }
+        
+        // Carica le spese fisse
+        const savedFixedExpenses = await db.getFixedExpenses();
+        if (savedFixedExpenses) {
+          setFixedExpenses(savedFixedExpenses);
+        }
+        
+        // Carica le spese future
+        const savedFutureExpenses = await db.getFutureExpenses();
+        if (savedFutureExpenses) {
+          setFutureExpenses(savedFutureExpenses);
+        }
+        
+        // Carica la cronologia dei risparmi
+        const savedSavingsHistory = await db.getSavingsHistory();
+        if (savedSavingsHistory) {
+          setSavingsHistory(savedSavingsHistory);
+          // Calcola il totale dei risparmi
+          const total = savedSavingsHistory.reduce((sum, entry) => sum + entry.amount, 0);
+          setTotalSavings(total);
+        }
+        
+      } catch (error) {
+        console.error('Errore nel caricamento dei dati:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadDataFromDB();
+  }, []);
+
+  // Salva le impostazioni quando cambiano
+  useEffect(() => {
+    if (!isLoading) {
+      const saveSettingsToDB = async () => {
+        try {
+          await db.saveSettings({
+            id: 'main-settings',
+            monthlyIncome,
+            lastPaydayDate,
+            nextPaydayDate,
+            paymentType,
+            customStartDate,
+            customEndDate,
+            savingsMode,
+            savingsPeriod,
+            savingsPercentage,
+            savingsFixedAmount,
+            savingsStartDate,
+            savingsEndDate,
+            userSettings,
+            streak,
+            achievements,
+            lastUpdated: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error('Errore nel salvataggio delle impostazioni:', error);
+        }
+      };
+      
+      saveSettingsToDB();
+    }
+  }, [
+    monthlyIncome, lastPaydayDate, nextPaydayDate, paymentType,
+    customStartDate, customEndDate, savingsMode, savingsPeriod,
+    savingsPercentage, savingsFixedAmount, savingsStartDate, savingsEndDate,
+    userSettings, streak, achievements, isLoading
+  ]);
 
   // Calcola il totale giornaliero delle spese future da sottrarre
   const getDailyFutureExpenses = () => {
@@ -460,86 +566,151 @@ export const AppProvider = ({ children }) => {
   };
 
   // Metodi per le transazioni
-  const addTransaction = (transaction) => {
-    const newTransaction = {
-      ...transaction,
-      id: Date.now(),
-      amount: parseFloat(transaction.amount),
-      type: transaction.type || 'expense'
-    };
-    setTransactions(prev => [newTransaction, ...prev]);
+  const addTransaction = async (transaction) => {
+    try {
+      const newTransaction = {
+        ...transaction,
+        amount: parseFloat(transaction.amount),
+        type: transaction.type || 'expense',
+        date: transaction.date || new Date().toISOString().split('T')[0]
+      };
+      
+      const id = await db.addTransaction(newTransaction);
+      newTransaction.id = id;
+      
+      setTransactions(prev => [newTransaction, ...prev]);
+    } catch (error) {
+      console.error('Errore nell\'aggiunta della transazione:', error);
+    }
   };
 
-  const updateTransaction = (id, updatedData) => {
-    setTransactions(prev => 
-      prev.map(transaction => 
-        transaction.id === id ? { ...transaction, ...updatedData } : transaction
-      )
-    );
+  const updateTransaction = async (id, updatedData) => {
+    try {
+      const updatedTransaction = { ...updatedData, id };
+      await db.updateTransaction(updatedTransaction);
+      
+      setTransactions(prev => 
+        prev.map(transaction => 
+          transaction.id === id ? updatedTransaction : transaction
+        )
+      );
+    } catch (error) {
+      console.error('Errore nell\'aggiornamento della transazione:', error);
+    }
   };
 
-  const deleteTransaction = (id) => {
-    setTransactions(prev => prev.filter(transaction => transaction.id !== id));
+  const deleteTransaction = async (id) => {
+    try {
+      await db.deleteTransaction(id);
+      setTransactions(prev => prev.filter(transaction => transaction.id !== id));
+    } catch (error) {
+      console.error('Errore nell\'eliminazione della transazione:', error);
+    }
   };
 
   // Metodi per le spese fisse
-  const addFixedExpense = (expense) => {
-    const newExpense = {
-      ...expense,
-      id: Date.now(),
-      amount: parseFloat(expense.amount)
-    };
-    setFixedExpenses(prev => [...prev, newExpense]);
+  const addFixedExpense = async (expense) => {
+    try {
+      const newExpense = {
+        ...expense,
+        amount: parseFloat(expense.amount)
+      };
+      
+      const id = await db.addFixedExpense(newExpense);
+      newExpense.id = id;
+      
+      setFixedExpenses(prev => [...prev, newExpense]);
+    } catch (error) {
+      console.error('Errore nell\'aggiunta della spesa fissa:', error);
+    }
   };
 
-  const deleteFixedExpense = (id) => {
-    setFixedExpenses(prev => prev.filter(expense => expense.id !== id));
+  const deleteFixedExpense = async (id) => {
+    try {
+      await db.deleteFixedExpense(id);
+      setFixedExpenses(prev => prev.filter(expense => expense.id !== id));
+    } catch (error) {
+      console.error('Errore nell\'eliminazione della spesa fissa:', error);
+    }
   };
 
   // Metodi per le spese future
-  const addFutureExpense = (expense) => {
-    const newExpense = {
-      ...expense,
-      id: Date.now(),
-      createdAt: new Date().toISOString()
-    };
-    setFutureExpenses(prev => [...prev, newExpense]);
+  const addFutureExpense = async (expense) => {
+    try {
+      const newExpense = {
+        ...expense,
+        createdAt: new Date().toISOString()
+      };
+      
+      const id = await db.addFutureExpense(newExpense);
+      newExpense.id = id;
+      
+      setFutureExpenses(prev => [...prev, newExpense]);
+    } catch (error) {
+      console.error('Errore nell\'aggiunta della spesa futura:', error);
+    }
   };
 
-  const updateFutureExpense = (id, updatedData) => {
-    setFutureExpenses(prev => 
-      prev.map(expense => 
-        expense.id === id ? { ...expense, ...updatedData } : expense
-      )
-    );
+  const updateFutureExpense = async (id, updatedData) => {
+    try {
+      const updatedExpense = { ...updatedData, id };
+      await db.updateFutureExpense(updatedExpense);
+      
+      setFutureExpenses(prev => 
+        prev.map(expense => 
+          expense.id === id ? updatedExpense : expense
+        )
+      );
+    } catch (error) {
+      console.error('Errore nell\'aggiornamento della spesa futura:', error);
+    }
   };
 
-  const deleteFutureExpense = (id) => {
-    setFutureExpenses(prev => prev.filter(expense => expense.id !== id));
+  const deleteFutureExpense = async (id) => {
+    try {
+      await db.deleteFutureExpense(id);
+      setFutureExpenses(prev => prev.filter(expense => expense.id !== id));
+    } catch (error) {
+      console.error('Errore nell\'eliminazione della spesa futura:', error);
+    }
   };
 
   // Funzione per aggiungere ai risparmi
-  const addToSavings = (amount, date = new Date().toISOString()) => {
-    const newEntry = {
-      id: Date.now(),
-      amount: parseFloat(amount),
-      date,
-      total: totalSavings + parseFloat(amount)
-    };
-    setSavingsHistory(prev => [...prev, newEntry]);
-    setTotalSavings(prev => prev + parseFloat(amount));
+  const addToSavings = async (amount, date = new Date().toISOString()) => {
+    try {
+      const newEntry = {
+        amount: parseFloat(amount),
+        date,
+        total: totalSavings + parseFloat(amount)
+      };
+      
+      const id = await db.addSavingsEntry(newEntry);
+      newEntry.id = id;
+      
+      setSavingsHistory(prev => [...prev, newEntry]);
+      setTotalSavings(prev => prev + parseFloat(amount));
+    } catch (error) {
+      console.error('Errore nell\'aggiunta ai risparmi:', error);
+    }
   };
 
   // Funzione per prelevare dai risparmi
-  const withdrawFromSavings = (amount, date = new Date().toISOString()) => {
-    const newEntry = {
-      id: Date.now(),
-      amount: -parseFloat(amount),
-      date,
-      total: totalSavings - parseFloat(amount)
-    };
-    setSavingsHistory(prev => [...prev, newEntry]);
-    setTotalSavings(prev => prev - parseFloat(amount));
+  const withdrawFromSavings = async (amount, date = new Date().toISOString()) => {
+    try {
+      const newEntry = {
+        amount: -parseFloat(amount),
+        date,
+        total: totalSavings - parseFloat(amount)
+      };
+      
+      const id = await db.addSavingsEntry(newEntry);
+      newEntry.id = id;
+      
+      setSavingsHistory(prev => [...prev, newEntry]);
+      setTotalSavings(prev => prev - parseFloat(amount));
+    } catch (error) {
+      console.error('Errore nel prelievo dai risparmi:', error);
+    }
   };
 
   // Sistema automatico per aggiungere risparmi alla fine del periodo
@@ -658,6 +829,7 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       // Stati
+      isLoading,
       currentView, setCurrentView,
       monthlyIncome, setMonthlyIncome,
       lastPaydayDate, setLastPaydayDate,

@@ -15,6 +15,7 @@ import SavingsSetup from './components/SavingsSetup';
 import Navigation from './components/Navigation';
 import OnboardingPage from './components/OnboardingPage';
 import LoadingScreen from './components/LoadingScreen';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 // Definizione delle animazioni per le transizioni tra pagine
 const pageVariants = {
@@ -29,21 +30,89 @@ const pageTransition = {
   damping: 30,
 };
 
+// Componente per mostrare lo stato offline
+const OfflineIndicator = ({ theme }) => {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  if (isOnline) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -50 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -50 }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: theme?.warning || '#FFB74D',
+        color: 'white',
+        padding: '8px',
+        textAlign: 'center',
+        fontSize: '14px',
+        fontWeight: '600',
+        zIndex: 100,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      }}
+    >
+      Modalità Offline - I dati vengono salvati localmente
+    </motion.div>
+  );
+};
+
 const AppContent = () => {
-  const { currentView, theme } = useContext(AppContext);
+  const { currentView, theme, isLoading } = useContext(AppContext);
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
   // Controlla se l'onboarding è stato completato
   useEffect(() => {
     const checkOnboarding = () => {
       const completed = localStorage.getItem('onboardingCompleted') === 'true';
       setIsOnboardingCompleted(completed);
-      setIsLoading(false);
+      setCheckingOnboarding(false);
     };
 
-    // Simula un breve caricamento per una transizione fluida
-    setTimeout(checkOnboarding, 500);
+    // Piccolo delay per una transizione fluida
+    setTimeout(checkOnboarding, 100);
+  }, []);
+
+  // Registra il service worker
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/pwabuilder-sw.js')
+        .then(registration => {
+          console.log('Service Worker registrato con successo:', registration);
+          
+          // Gestisci gli aggiornamenti del service worker
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Nuovo service worker disponibile
+                console.log('Nuovo contenuto disponibile, ricarica per aggiornare');
+              }
+            });
+          });
+        })
+        .catch(error => {
+          console.error('Errore durante la registrazione del Service Worker:', error);
+        });
+    }
   }, []);
 
   // Funzione per gestire il completamento dell'onboarding
@@ -51,8 +120,8 @@ const AppContent = () => {
     setIsOnboardingCompleted(true);
   };
 
-  // Se sta caricando, mostra lo schermo di caricamento
-  if (isLoading) {
+  // Se sta caricando i dati dal database o controllando l'onboarding
+  if (isLoading || checkingOnboarding) {
     return <LoadingScreen theme={theme} />;
   }
 
@@ -95,6 +164,11 @@ const AppContent = () => {
         overflow: 'hidden',
       }}
     >
+      {/* Indicatore offline */}
+      <AnimatePresence>
+        <OfflineIndicator theme={theme} />
+      </AnimatePresence>
+
       {/* Contenitore principale con animazioni per le transizioni tra pagine */}
       <AnimatePresence mode="wait">
         <motion.div
@@ -115,6 +189,9 @@ const AppContent = () => {
 
       {/* Navigation bar fissa in basso */}
       <Navigation />
+      
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   );
 };
