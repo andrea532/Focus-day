@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Receipt,
@@ -9,8 +9,459 @@ import {
   Calendar,
   Calculator,
   AlertCircle,
+  ArrowLeft,
+  Check,
 } from 'lucide-react';
 import { AppContext } from '../context/AppContext';
+
+// Componente Form Fullscreen Semplificato per Spese Future
+const FutureExpenseFormFullscreen = ({ isOpen, onClose, onSave, editingExpense, categories, theme }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    amount: '',
+    dueDate: '',
+    categoryId: 1,
+    description: '',
+  });
+  const [amountDisplay, setAmountDisplay] = useState('');
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+
+  // Controlla la dimensione dello schermo
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setScreenWidth(window.innerWidth);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => {
+      window.removeEventListener('resize', checkScreenSize);
+    };
+  }, []);
+
+  // Determinare il layout in base alla dimensione dello schermo
+  const isDesktop = screenWidth > 768;
+  const isMobile = screenWidth <= 480;
+  const isVerySmall = screenWidth <= 360;
+
+  // Reset del form quando si apre
+  useEffect(() => {
+    if (isOpen) {
+      if (editingExpense) {
+        setFormData({
+          name: editingExpense.name,
+          amount: editingExpense.amount.toString(),
+          dueDate: editingExpense.dueDate,
+          categoryId: editingExpense.categoryId,
+          description: editingExpense.description || '',
+        });
+        setAmountDisplay(editingExpense.amount.toString());
+      } else {
+        setFormData({
+          name: '',
+          amount: '',
+          dueDate: '',
+          categoryId: 1,
+          description: '',
+        });
+        setAmountDisplay('');
+      }
+    }
+  }, [isOpen, editingExpense]);
+
+  if (!isOpen) return null;
+
+  // Calcola i giorni rimanenti
+  const calculateDaysRemaining = (dueDate) => {
+    if (!dueDate) return null;
+    const today = new Date();
+    const due = new Date(dueDate);
+    const diffTime = due - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  // Gestione selezione categoria
+  const handleSelectCategory = (category) => {
+    setFormData({ ...formData, categoryId: category.id });
+  };
+
+  // Validazione form
+  const isFormValid = () => {
+    return formData.name && formData.amount && formData.dueDate && 
+           !isNaN(parseFloat(formData.amount)) && parseFloat(formData.amount) > 0;
+  };
+
+  // Gestione salvataggio
+  const handleSave = () => {
+    if (!isFormValid()) return;
+
+    onSave({
+      ...formData,
+      amount: parseFloat(formData.amount), // Salviamo il valore direttamente senza moltiplicare
+    });
+
+    onClose();
+  };
+
+  const daysRemaining = calculateDaysRemaining(formData.dueDate);
+  const dailyAmount = daysRemaining > 0 && formData.amount ? 
+    (parseFloat(formData.amount) / daysRemaining).toFixed(2) : '0.00';
+
+  // Filtra solo le categorie di spesa
+  const expenseCategories = categories.filter(cat => cat.id <= 20);
+
+  // Calcola il numero di colonne in base alla dimensione dello schermo
+  const getGridColumns = () => {
+    if (isDesktop) return 'repeat(4, 1fr)';
+    if (isVerySmall) return 'repeat(2, 1fr)';
+    return 'repeat(3, 1fr)';
+  };
+
+  return (
+    <div style={{ 
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: theme.background,
+      zIndex: 50,
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      width: '100%',
+      maxWidth: isDesktop ? '100%' : '428px',
+      margin: '0 auto',
+      overflow: 'hidden'
+    }}>
+      {/* Header */}
+      <header style={{ 
+        padding: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+        borderBottom: `1px solid ${theme.border}`,
+        backgroundColor: theme.card,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        position: 'relative',
+        zIndex: 2
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            padding: isVerySmall ? '2px 4px' : isMobile ? '4px 8px' : '8px 16px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: theme.textSecondary,
+            fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
+            fontWeight: '500',
+            cursor: 'pointer'
+          }}
+        >
+          Annulla
+        </button>
+
+        <h2 style={{
+          fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+          fontWeight: '600',
+          color: theme.text,
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: isVerySmall ? '150px' : isMobile ? '200px' : '300px'
+        }}>
+          {editingExpense ? 'Modifica Spesa' : 'Nuova Spesa Futura'}
+        </h2>
+
+        <button
+          onClick={handleSave}
+          disabled={!isFormValid()}
+          style={{
+            padding: isVerySmall ? '2px 4px' : isMobile ? '4px 8px' : '8px 16px',
+            backgroundColor: isFormValid() ? theme.primary : theme.border,
+            border: 'none',
+            borderRadius: '8px',
+            color: 'white',
+            fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
+            fontWeight: '600',
+            cursor: isFormValid() ? 'pointer' : 'not-allowed',
+            opacity: isFormValid() ? 1 : 0.5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: isVerySmall ? '2px' : '4px'
+          }}
+        >
+          <Check size={isVerySmall ? 14 : isMobile ? 16 : 18} />
+          Salva
+        </button>
+      </header>
+
+      {/* Contenuto scrollabile */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: isVerySmall ? '16px 8px' : isMobile ? '20px 12px' : isDesktop ? '32px 24px' : '24px 16px',
+        maxWidth: isDesktop ? '800px' : '100%',
+        margin: isDesktop ? '0 auto' : '0',
+        width: '100%'
+      }}>
+        {/* Sezione Nome e Importo */}
+        <div style={{ marginBottom: '32px' }}>
+          {/* Nome spesa */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: isVerySmall ? '12px' : '14px',
+              fontWeight: '500',
+              color: theme.textSecondary,
+              marginBottom: '8px'
+            }}>
+              Nome della spesa
+            </label>
+            <div style={{
+              backgroundColor: theme.card,
+              borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+              padding: isVerySmall ? '12px' : isMobile ? '16px' : '20px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+            }}>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="es. Bollo auto, Assicurazione"
+                style={{
+                  width: '100%',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+                  color: theme.text
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Importo */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: isVerySmall ? '12px' : '14px',
+              fontWeight: '500',
+              color: theme.textSecondary,
+              marginBottom: '8px'
+            }}>
+              Importo totale
+            </label>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: theme.card,
+              borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+              padding: isVerySmall ? '12px' : isMobile ? '16px' : '20px',
+              gap: isVerySmall ? '6px' : isMobile ? '8px' : '12px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+            }}>
+              <span style={{
+                fontSize: isVerySmall ? '20px' : isMobile ? '24px' : '28px',
+                fontWeight: '700',
+                color: theme.primary
+              }}>
+                €
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={amountDisplay}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (/^[0-9]*$/.test(value) || value === '') {
+                    setAmountDisplay(value);
+                    setFormData({ ...formData, amount: value });
+                  }
+                }}
+                placeholder="0"
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: isVerySmall ? '20px' : isMobile ? '24px' : '28px',
+                  fontWeight: '700',
+                  color: theme.text,
+                  width: '100%'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Data scadenza */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: isVerySmall ? '12px' : '14px',
+              fontWeight: '500',
+              color: theme.textSecondary,
+              marginBottom: '8px'
+            }}>
+              Data di scadenza
+            </label>
+            <input
+              type="date"
+              value={formData.dueDate}
+              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+              style={{
+                width: '100%',
+                padding: isVerySmall ? '12px' : isMobile ? '16px' : '20px',
+                borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                backgroundColor: theme.card,
+                border: 'none',
+                outline: 'none',
+                fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+                color: theme.text,
+                boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Categoria */}
+        <div style={{ marginBottom: '32px' }}>
+          <label style={{
+            display: 'block',
+            fontSize: isVerySmall ? '12px' : '14px',
+            fontWeight: '500',
+            color: theme.textSecondary,
+            marginBottom: '12px'
+          }}>
+            Categoria
+          </label>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: getGridColumns(),
+            gap: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+            width: '100%'
+          }}>
+            {expenseCategories.map((category) => (
+              <motion.div
+                key={category.id}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => handleSelectCategory(category)}
+                style={{
+                  backgroundColor: formData.categoryId === category.id ? `${category.color}10` : theme.card,
+                  borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                  padding: isVerySmall ? '12px 4px' : isMobile ? '16px 8px' : '20px 8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: isVerySmall ? '4px' : '8px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                  border: formData.categoryId === category.id 
+                    ? `1px solid ${category.color}` 
+                    : `1px solid ${theme.card}`,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <div style={{ 
+                  fontSize: isVerySmall ? '24px' : isMobile ? '28px' : '32px'
+                }}>
+                  {category.icon}
+                </div>
+                <span style={{ 
+                  fontSize: isVerySmall ? '10px' : '11px', 
+                  fontWeight: '500',
+                  color: theme.textSecondary,
+                  textAlign: 'center',
+                  lineHeight: '1.2'
+                }}>
+                  {category.name}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* Preview calcolo */}
+        {formData.amount && formData.dueDate && daysRemaining > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              padding: isVerySmall ? '16px' : isMobile ? '20px' : '24px',
+              borderRadius: isVerySmall ? '12px' : '16px',
+              background: `linear-gradient(135deg, ${theme.primary}10 0%, ${theme.primary}05 100%)`,
+              border: `1px solid ${theme.primary}30`,
+              textAlign: 'center',
+              marginBottom: '32px'
+            }}
+          >
+            <p style={{ 
+              fontSize: isVerySmall ? '11px' : '12px', 
+              color: theme.textSecondary,
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Dovrai accantonare
+            </p>
+            <p style={{ 
+              fontSize: isVerySmall ? '24px' : isMobile ? '28px' : '32px', 
+              fontWeight: '700',
+              color: theme.primary,
+              marginBottom: '4px'
+            }}>
+              € {dailyAmount}
+            </p>
+            <p style={{ 
+              fontSize: isVerySmall ? '12px' : '14px', 
+              color: theme.textSecondary
+            }}>
+              al giorno per {daysRemaining} giorni
+            </p>
+          </motion.div>
+        )}
+
+        {/* Descrizione */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: isVerySmall ? '12px' : '14px',
+            fontWeight: '500',
+            color: theme.textSecondary,
+            marginBottom: '8px'
+          }}>
+            Note (opzionale)
+          </label>
+          
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="Aggiungi dettagli o promemoria..."
+            style={{
+              width: '100%',
+              padding: isVerySmall ? '12px' : isMobile ? '16px' : '20px',
+              borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+              backgroundColor: theme.card,
+              border: 'none',
+              outline: 'none',
+              fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+              color: theme.text,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+              minHeight: '80px',
+              resize: 'none'
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const FutureExpensesPage = () => {
   const {
@@ -22,15 +473,8 @@ const FutureExpensesPage = () => {
     categories,
   } = useContext(AppContext);
 
-  const [showAddExpense, setShowAddExpense] = useState(false);
-  const [editingExpenseId, setEditingExpenseId] = useState(null);
-  const [newExpense, setNewExpense] = useState({
-    name: '',
-    amount: '',
-    dueDate: '',
-    categoryId: 1,
-    description: '',
-  });
+  const [showFormFullscreen, setShowFormFullscreen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
 
   // Animazioni
   const containerVariants = {
@@ -81,63 +525,63 @@ const FutureExpensesPage = () => {
   };
 
   // Handlers
-  const handleAddExpense = () => {
-    if (
-      !newExpense.name ||
-      !newExpense.amount ||
-      !newExpense.dueDate ||
-      isNaN(parseFloat(newExpense.amount)) ||
-      parseFloat(newExpense.amount) <= 0
-    ) {
-      return;
-    }
-
+  const handleSaveExpense = (formData) => {
     const expense = {
-      ...newExpense,
-      amount: parseFloat(newExpense.amount),
-      categoryId: parseInt(newExpense.categoryId),
+      name: formData.name,
+      amount: formData.amount,
+      dueDate: formData.dueDate,
+      categoryId: formData.categoryId,
+      description: formData.description,
     };
 
-    if (editingExpenseId) {
-      updateFutureExpense(editingExpenseId, expense);
-      setEditingExpenseId(null);
+    if (editingExpense) {
+      updateFutureExpense(editingExpense.id, expense);
     } else {
       addFutureExpense(expense);
     }
 
-    setNewExpense({
-      name: '',
-      amount: '',
-      dueDate: '',
-      categoryId: 1,
-      description: '',
-    });
-    setShowAddExpense(false);
+    setEditingExpense(null);
+    setShowFormFullscreen(false);
   };
 
   const handleEditExpense = (expense) => {
-    setNewExpense({
-      name: expense.name,
-      amount: expense.amount.toString(),
-      dueDate: expense.dueDate,
-      categoryId: expense.categoryId,
-      description: expense.description || '',
-    });
-    setEditingExpenseId(expense.id);
-    setShowAddExpense(true);
+    setEditingExpense(expense);
+    setShowFormFullscreen(true);
   };
 
   const handleDeleteExpense = (id) => {
     deleteFutureExpense(id);
   };
 
+  const handleOpenForm = () => {
+    setEditingExpense(null);
+    setShowFormFullscreen(true);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="future-expenses-page"
+      className="future-expenses-page scrollable-page"
       style={{ paddingBottom: '100px' }}
     >
+      {/* Form Fullscreen */}
+      <AnimatePresence>
+        {showFormFullscreen && (
+          <FutureExpenseFormFullscreen
+            isOpen={showFormFullscreen}
+            onClose={() => {
+              setShowFormFullscreen(false);
+              setEditingExpense(null);
+            }}
+            onSave={handleSaveExpense}
+            editingExpense={editingExpense}
+            categories={categories}
+            theme={theme}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <motion.div
         initial={{ y: -20, opacity: 0 }}
@@ -328,223 +772,7 @@ const FutureExpensesPage = () => {
               Gestisci le tue spese imminenti
             </p>
           </div>
-
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => {
-              setNewExpense({
-                name: '',
-                amount: '',
-                dueDate: '',
-                categoryId: 1,
-                description: '',
-              });
-              setEditingExpenseId(null);
-              setShowAddExpense(!showAddExpense);
-            }}
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              backgroundColor: `${theme.primary}15`,
-              color: theme.primary,
-              border: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            {showAddExpense ? <Minus size={20} /> : <Plus size={20} />}
-          </motion.button>
         </div>
-
-        {/* Form aggiunta/modifica spesa */}
-        <AnimatePresence>
-          {showAddExpense && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              style={{
-                overflow: 'hidden',
-                marginBottom: '24px',
-              }}
-            >
-              <div
-                style={{
-                  padding: '20px',
-                  borderRadius: '16px',
-                  backgroundColor: theme.background,
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px',
-                  }}
-                >
-                  <input
-                    type="text"
-                    placeholder="Nome spesa (es. Bollo auto, Assicurazione)"
-                    value={newExpense.name}
-                    onChange={(e) =>
-                      setNewExpense({ ...newExpense, name: e.target.value })
-                    }
-                    style={{
-                      padding: '16px',
-                      borderRadius: '12px',
-                      border: `1px solid ${theme.border}`,
-                      backgroundColor: 'white',
-                      color: theme.text,
-                      fontSize: '16px',
-                    }}
-                  />
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div>
-                      <label
-                        style={{
-                          fontSize: '14px',
-                          color: theme.textSecondary,
-                          display: 'block',
-                          marginBottom: '8px',
-                        }}
-                      >
-                        Importo totale (€)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="0.00"
-                        value={newExpense.amount}
-                        onChange={(e) =>
-                          setNewExpense({ ...newExpense, amount: e.target.value })
-                        }
-                        style={{
-                          width: '100%',
-                          padding: '16px',
-                          borderRadius: '12px',
-                          border: `1px solid ${theme.border}`,
-                          backgroundColor: 'white',
-                          color: theme.text,
-                          fontSize: '16px',
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        style={{
-                          fontSize: '14px',
-                          color: theme.textSecondary,
-                          display: 'block',
-                          marginBottom: '8px',
-                        }}
-                      >
-                        Data scadenza
-                      </label>
-                      <input
-                        type="date"
-                        value={newExpense.dueDate}
-                        onChange={(e) =>
-                          setNewExpense({ ...newExpense, dueDate: e.target.value })
-                        }
-                        style={{
-                          width: '100%',
-                          padding: '16px',
-                          borderRadius: '12px',
-                          border: `1px solid ${theme.border}`,
-                          backgroundColor: 'white',
-                          color: theme.text,
-                          fontSize: '16px',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      style={{
-                        fontSize: '14px',
-                        color: theme.textSecondary,
-                        display: 'block',
-                        marginBottom: '8px',
-                      }}
-                    >
-                      Categoria
-                    </label>
-                    <select
-                      value={newExpense.categoryId}
-                      onChange={(e) =>
-                        setNewExpense({
-                          ...newExpense,
-                          categoryId: parseInt(e.target.value),
-                        })
-                      }
-                      style={{
-                        width: '100%',
-                        padding: '16px',
-                        borderRadius: '12px',
-                        border: `1px solid ${theme.border}`,
-                        backgroundColor: 'white',
-                        color: theme.text,
-                        fontSize: '16px',
-                      }}
-                    >
-                      {categories
-                        .filter(cat => cat.id <= 20)
-                        .map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.icon} {category.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="Descrizione (opzionale)"
-                    value={newExpense.description}
-                    onChange={(e) =>
-                      setNewExpense({ ...newExpense, description: e.target.value })
-                    }
-                    style={{
-                      padding: '16px',
-                      borderRadius: '12px',
-                      border: `1px solid ${theme.border}`,
-                      backgroundColor: 'white',
-                      color: theme.text,
-                      fontSize: '16px',
-                    }}
-                  />
-
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleAddExpense}
-                    style={{
-                      padding: '16px',
-                      borderRadius: '12px',
-                      background: `linear-gradient(135deg, ${theme.primary} 0%, #5A85FF 100%)`,
-                      color: 'white',
-                      fontWeight: '600',
-                      fontSize: '16px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      marginTop: '8px',
-                    }}
-                  >
-                    {editingExpenseId ? 'Aggiorna spesa' : 'Aggiungi spesa'}
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Lista delle spese */}
         <motion.div
@@ -787,6 +1015,40 @@ const FutureExpensesPage = () => {
             </motion.div>
           )}
         </motion.div>
+      </motion.div>
+
+      {/* Fixed Action Button */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        style={{
+          position: 'fixed',
+          bottom: '120px',
+          right: '24px',
+          zIndex: 20,
+        }}
+      >
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={handleOpenForm}
+          style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            backgroundColor: theme.primary,
+            color: 'white',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(76, 111, 255, 0.3)',
+            cursor: 'pointer',
+          }}
+        >
+          <Plus size={24} />
+        </motion.button>
       </motion.div>
     </motion.div>
   );

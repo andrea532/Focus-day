@@ -14,25 +14,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
   touch-action: pan-y;
+  min-height: 100vh;
 }
 
 #root {
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
-}
-
-/* Prevent bounce scrolling on iOS */
-body {
-  position: fixed;
-  width: 100%;
-  height: 100%;
-}
-
-#root {
-  height: 100%;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 /* Mobile optimizations */
@@ -58,4 +46,50 @@ button {
 /* Safe area for iPhones */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Classe specifica per bloccare lo scroll (da usare solo quando necessario) */
+.no-scroll {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-overflow-scrolling: none;
+  overscroll-behavior: none;
+}
+
+/* Stile specifico per contenitore dashboard */
+.dashboard-fixed {
+  height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Stile per le pagine scrollabili */
+.scrollable-page {
+  min-height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Accessibilità: assicurati che gli elementi interattivi siano comunque navigabili con tastiera */
+button:focus, input:focus, select:focus {
+  outline: 2px solid rgba(76, 111, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Fix per prevenire il bounce scroll su iOS solo quando necessario */
+.ios-no-bounce {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }

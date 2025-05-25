@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppContext, AppProvider } from './context/AppContext';
 import './styles/globals.css';
@@ -13,6 +13,8 @@ import IncomeSetup from './components/IncomeSetup';
 import ExpensesSetup from './components/ExpensesSetup';
 import SavingsSetup from './components/SavingsSetup';
 import Navigation from './components/Navigation';
+import OnboardingPage from './components/OnboardingPage';
+import LoadingScreen from './components/LoadingScreen';
 
 // Definizione delle animazioni per le transizioni tra pagine
 const pageVariants = {
@@ -29,6 +31,35 @@ const pageTransition = {
 
 const AppContent = () => {
   const { currentView, theme } = useContext(AppContext);
+  const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Controlla se l'onboarding è stato completato
+  useEffect(() => {
+    const checkOnboarding = () => {
+      const completed = localStorage.getItem('onboardingCompleted') === 'true';
+      setIsOnboardingCompleted(completed);
+      setIsLoading(false);
+    };
+
+    // Simula un breve caricamento per una transizione fluida
+    setTimeout(checkOnboarding, 500);
+  }, []);
+
+  // Funzione per gestire il completamento dell'onboarding
+  const handleOnboardingComplete = () => {
+    setIsOnboardingCompleted(true);
+  };
+
+  // Se sta caricando, mostra lo schermo di caricamento
+  if (isLoading) {
+    return <LoadingScreen theme={theme} />;
+  }
+
+  // Se l'onboarding non è completato, mostra OnboardingPage
+  if (!isOnboardingCompleted) {
+    return <OnboardingPage onComplete={handleOnboardingComplete} />;
+  }
 
   // Funzione per renderizzare la vista corrente
   const renderView = () => {

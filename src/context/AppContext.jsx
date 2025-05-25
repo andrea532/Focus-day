@@ -8,8 +8,19 @@ export const AppProvider = ({ children }) => {
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [lastPaydayDate, setLastPaydayDate] = useState('');
   const [nextPaydayDate, setNextPaydayDate] = useState('');
+  const [paymentType, setPaymentType] = useState('monthly');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [fixedExpenses, setFixedExpenses] = useState([]);
+  
+  // STATI AGGIORNATI PER RISPARMI - SOLO PERIODI CUSTOM
+  const [savingsMode, setSavingsMode] = useState('percentage'); // percentage o fixed
+  const [savingsPeriod, setSavingsPeriod] = useState('custom'); // SEMPRE custom ora
   const [savingsPercentage, setSavingsPercentage] = useState(10);
+  const [savingsFixedAmount, setSavingsFixedAmount] = useState(0);
+  const [savingsStartDate, setSavingsStartDate] = useState('');
+  const [savingsEndDate, setSavingsEndDate] = useState('');
+  
   const [transactions, setTransactions] = useState([]);
   const [savingsHistory, setSavingsHistory] = useState([]);
   const [totalSavings, setTotalSavings] = useState(0);
@@ -87,14 +98,168 @@ export const AppProvider = ({ children }) => {
     }, 0);
   };
 
-  // FUNZIONI IMPORTANTI
-  const calculateDailyBudget = () => {
-    const totalFixedExpenses = fixedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-    const savingsAmount = (monthlyIncome * savingsPercentage) / 100;
-    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-    const dailyBudget = (monthlyIncome - totalFixedExpenses - savingsAmount) / daysInMonth;
+  // Funzione per calcolare i giorni nel periodo di pagamento - METODO AFFIDABILE
+  const getDaysInPaymentPeriod = () => {
+    if (paymentType === 'custom' && customStartDate && customEndDate) {
+      const start = new Date(customStartDate + 'T00:00:00');
+      const end = new Date(customEndDate + 'T00:00:00');
+      
+      let count = 0;
+      const current = new Date(start);
+      
+      while (current <= end) {
+        count++;
+        current.setDate(current.getDate() + 1);
+      }
+      
+      return count;
+    } else {
+      return new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    }
+  };
+
+  // FUNZIONE AGGIORNATA: Calcola i giorni nel periodo di risparmio (sempre custom)
+  const getDaysInSavingsPeriod = () => {
+    if (savingsStartDate && savingsEndDate) {
+      const start = new Date(savingsStartDate + 'T00:00:00');
+      const end = new Date(savingsEndDate + 'T00:00:00');
+      
+      let count = 0;
+      const current = new Date(start);
+      
+      while (current <= end) {
+        count++;
+        current.setDate(current.getDate() + 1);
+      }
+      
+      return count;
+    }
+    return 0;
+  };
+
+  // FUNZIONE AGGIORNATA: Calcola l'importo del risparmio per il periodo
+  const getMonthlySavingsAmount = () => {
+    const periodDays = getDaysInSavingsPeriod();
+    if (periodDays === 0) return 0;
     
-    // Sottrai le spese future giornaliere
+    if (savingsMode === 'percentage') {
+      return (monthlyIncome * savingsPercentage) / 100;
+    } else {
+      return savingsFixedAmount;
+    }
+  };
+
+  // FUNZIONE AGGIORNATA: Calcola il risparmio giornaliero
+  const getDailySavingsAmount = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (savingsStartDate && savingsEndDate) {
+      const start = new Date(savingsStartDate + 'T00:00:00');
+      const end = new Date(savingsEndDate + 'T00:00:00');
+      
+      // Verifica se siamo nel periodo di risparmio
+      if (today >= start && today <= end) {
+        const daysInPeriod = getDaysInSavingsPeriod();
+        const totalSavings = getMonthlySavingsAmount();
+        return daysInPeriod > 0 ? totalSavings / daysInPeriod : 0;
+      }
+    }
+    return 0; // Fuori dal periodo di risparmio
+  };
+
+  // FUNZIONE AGGIORNATA: Calcola il budget giornaliero
+  const calculateDailyBudget = () => {
+    // Gestione automatica ripetizione periodo
+    const checkAndUpdatePeriod = () => {
+      const isRepeating = localStorage.getItem('incomeRepeating') === 'true';
+      
+      if (isRepeating && paymentType === 'custom' && customStartDate && customEndDate) {
+        const today = new Date();
+        const endDate = new Date(customEndDate);
+        
+        if (today > endDate) {
+          const start = new Date(customStartDate + 'T00:00:00');
+          const end = new Date(customEndDate + 'T00:00:00');
+          
+          let periodDays = 0;
+          const tempCurrent = new Date(start);
+          while (tempCurrent <= end) {
+            periodDays++;
+            tempCurrent.setDate(tempCurrent.getDate() + 1);
+          }
+          
+          const newStart = new Date(endDate);
+          newStart.setDate(newStart.getDate() + 1);
+          const newEnd = new Date(newStart);
+          newEnd.setDate(newEnd.getDate() + periodDays - 1);
+          
+          setCustomStartDate(newStart.toISOString().split('T')[0]);
+          setCustomEndDate(newEnd.toISOString().split('T')[0]);
+          setLastPaydayDate(newStart.toISOString().split('T')[0]);
+          setNextPaydayDate(newEnd.toISOString().split('T')[0]);
+        }
+      }
+    };
+    
+    checkAndUpdatePeriod();
+    
+    // Calcola le spese fisse giornaliere considerando i periodi personalizzati
+    const getDailyFixedExpenses = () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      return fixedExpenses.reduce((total, expense) => {
+        // Ora tutte le spese hanno periodo custom
+        if (expense.customStartDate && expense.customEndDate) {
+          const start = new Date(expense.customStartDate + 'T00:00:00');
+          const end = new Date(expense.customEndDate + 'T00:00:00');
+          
+          // Verifica se siamo nel periodo attivo
+          if (today >= start && today <= end) {
+            let diffDays = 0;
+            const tempCurrent = new Date(start);
+            while (tempCurrent <= end) {
+              diffDays++;
+              tempCurrent.setDate(tempCurrent.getDate() + 1);
+            }
+            return total + (expense.amount / diffDays);
+          }
+          
+          // Se la spesa ha ripetizione automatica, controlla se dovremmo essere in un nuovo periodo
+          if (expense.isRepeating && today > end) {
+            // Calcola il periodo corrente basato sulla ripetizione
+            let periodDays = 0;
+            const tempCurrent = new Date(start);
+            while (tempCurrent <= end) {
+              periodDays++;
+              tempCurrent.setDate(tempCurrent.getDate() + 1);
+            }
+            
+            // Calcola in quale periodo dovremmo essere
+            const daysPassed = Math.floor((today - end) / (1000 * 60 * 60 * 24));
+            const periodsToAdd = Math.ceil(daysPassed / periodDays);
+            
+            const currentPeriodStart = new Date(start);
+            currentPeriodStart.setDate(currentPeriodStart.getDate() + (periodDays * periodsToAdd));
+            const currentPeriodEnd = new Date(end);
+            currentPeriodEnd.setDate(currentPeriodEnd.getDate() + (periodDays * periodsToAdd));
+            
+            if (today >= currentPeriodStart && today <= currentPeriodEnd) {
+              return total + (expense.amount / periodDays);
+            }
+          }
+        }
+        return total;
+      }, 0);
+    };
+    
+    const dailyFixedExpenses = getDailyFixedExpenses();
+    const dailySavings = getDailySavingsAmount();
+    const daysInPeriod = getDaysInPaymentPeriod();
+    const dailyIncome = monthlyIncome / daysInPeriod;
+    
+    const dailyBudget = dailyIncome - dailyFixedExpenses - dailySavings;
     const dailyFutureExpenses = getDailyFutureExpenses();
     const finalBudget = dailyBudget - dailyFutureExpenses;
     
@@ -123,8 +288,97 @@ export const AppProvider = ({ children }) => {
   };
 
   const getMonthlyAvailability = () => {
-    const totalFixedExpenses = fixedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-    const savingsAmount = (monthlyIncome * savingsPercentage) / 100;
+    if (paymentType === 'custom' && customStartDate && customEndDate) {
+      const isRepeating = localStorage.getItem('incomeRepeating') === 'true';
+      const today = new Date();
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      
+      let currentPeriodStart = start;
+      let currentPeriodEnd = end;
+      
+      if (isRepeating && today > end) {
+        let periodDays = 0;
+        const tempCurrent = new Date(start);
+        while (tempCurrent <= end) {
+          periodDays++;
+          tempCurrent.setDate(tempCurrent.getDate() + 1);
+        }
+        
+        const daysPassed = Math.floor((today - end) / (1000 * 60 * 60 * 24));
+        const periodsToAdd = Math.ceil(daysPassed / periodDays);
+        
+        currentPeriodStart = new Date(start);
+        currentPeriodStart.setDate(currentPeriodStart.getDate() + (periodDays * periodsToAdd));
+        currentPeriodEnd = new Date(end);
+        currentPeriodEnd.setDate(currentPeriodEnd.getDate() + (periodDays * periodsToAdd));
+      }
+      
+      const periodExpenses = transactions
+        .filter(t => {
+          const tDate = new Date(t.date);
+          return t.type === 'expense' && 
+                 tDate >= currentPeriodStart && 
+                 tDate <= currentPeriodEnd;
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      let periodDays = 0;
+      const tempPeriodCurrent = new Date(currentPeriodStart);
+      while (tempPeriodCurrent <= currentPeriodEnd) {
+        periodDays++;
+        tempPeriodCurrent.setDate(tempPeriodCurrent.getDate() + 1);
+      }
+      
+      const dailyFixedExpenses = fixedExpenses.reduce((sum, expense) => {
+        if (expense.customStartDate && expense.customEndDate) {
+          const expStart = new Date(expense.customStartDate);
+          const expEnd = new Date(expense.customEndDate);
+          if (today >= expStart && today <= expEnd) {
+            let expDays = 0;
+            const tempExpCurrent = new Date(expStart);
+            while (tempExpCurrent <= expEnd) {
+              expDays++;
+              tempExpCurrent.setDate(tempExpCurrent.getDate() + 1);
+            }
+            return sum + (expense.amount / expDays);
+          }
+        }
+        return sum;
+      }, 0);
+      
+      const totalFixedExpenses = dailyFixedExpenses * periodDays;
+      const savingsAmount = getDailySavingsAmount() * periodDays;
+      
+      return monthlyIncome - totalFixedExpenses - savingsAmount - periodExpenses;
+    }
+    
+    // Comportamento normale per pagamento mensile
+    const getMonthlyFixedExpenses = () => {
+      const today = new Date();
+      
+      return fixedExpenses.reduce((total, expense) => {
+        if (expense.customStartDate && expense.customEndDate) {
+          const start = new Date(expense.customStartDate);
+          const end = new Date(expense.customEndDate);
+          
+          if (today >= start && today <= end) {
+            let diffDays = 0;
+            const tempCurrent = new Date(start);
+            while (tempCurrent <= end) {
+              diffDays++;
+              tempCurrent.setDate(tempCurrent.getDate() + 1);
+            }
+            const dailyAmount = expense.amount / diffDays;
+            return total + (dailyAmount * 30);
+          }
+        }
+        return total;
+      }, 0);
+    };
+    
+    const totalFixedExpenses = getMonthlyFixedExpenses();
+    const monthlySavings = getMonthlySavingsAmount();
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
@@ -137,16 +391,72 @@ export const AppProvider = ({ children }) => {
       })
       .reduce((sum, t) => sum + t.amount, 0);
 
-    return monthlyIncome - totalFixedExpenses - savingsAmount - monthlyExpenses;
+    return monthlyIncome - totalFixedExpenses - monthlySavings - monthlyExpenses;
   };
 
   const getDaysUntilPayday = () => {
+    const isRepeating = localStorage.getItem('incomeRepeating') === 'true';
+    
+    if (paymentType === 'custom' && customEndDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const endDate = new Date(customEndDate + 'T00:00:00');
+      
+      if (today > endDate && isRepeating) {
+        const start = new Date(customStartDate + 'T00:00:00');
+        
+        let periodDays = 0;
+        const tempCurrent = new Date(start);
+        while (tempCurrent <= endDate) {
+          periodDays++;
+          tempCurrent.setDate(tempCurrent.getDate() + 1);
+        }
+        
+        const daysPassed = Math.floor((today - endDate) / (1000 * 60 * 60 * 24));
+        const periodsToAdd = Math.ceil(daysPassed / periodDays);
+        
+        const newEnd = new Date(endDate);
+        newEnd.setDate(newEnd.getDate() + (periodDays * periodsToAdd));
+        
+        let daysUntil = 0;
+        const current = new Date(today);
+        while (current < newEnd) {
+          daysUntil++;
+          current.setDate(current.getDate() + 1);
+        }
+        
+        return daysUntil;
+      }
+      
+      if (today > endDate) return 0;
+      
+      let daysUntil = 0;
+      const current = new Date(today);
+      while (current < endDate) {
+        daysUntil++;
+        current.setDate(current.getDate() + 1);
+      }
+      
+      return daysUntil;
+    }
+    
     if (!nextPaydayDate) return null;
     const today = new Date();
-    const nextPayday = new Date(nextPaydayDate);
-    const diffTime = nextPayday - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
+    today.setHours(0, 0, 0, 0);
+    
+    const nextPayday = new Date(nextPaydayDate + 'T00:00:00');
+    
+    if (today > nextPayday) return 0;
+    
+    let daysUntil = 0;
+    const current = new Date(today);
+    while (current < nextPayday) {
+      daysUntil++;
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return daysUntil;
   };
 
   // Metodi per le transazioni
@@ -232,29 +542,54 @@ export const AppProvider = ({ children }) => {
     setTotalSavings(prev => prev - parseFloat(amount));
   };
 
-  // Sistema automatico per aggiungere risparmi mensili
+  // Sistema automatico per aggiungere risparmi alla fine del periodo
   useEffect(() => {
-    // Controlla se è il giorno di paga
-    if (nextPaydayDate) {
-      const today = new Date();
-      const payday = new Date(nextPaydayDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Per risparmi con periodo personalizzato
+    if (savingsPeriod === 'custom' && savingsEndDate) {
+      const endDate = new Date(savingsEndDate + 'T00:00:00');
+      const isRepeating = localStorage.getItem('savingsRepeating') === 'true';
       
-      // Se oggi è il giorno di paga
-      if (today.toDateString() === payday.toDateString()) {
-        // Calcola e aggiungi automaticamente il risparmio mensile
-        const monthlyAutomaticSavings = (monthlyIncome * savingsPercentage) / 100;
-        if (monthlyAutomaticSavings > 0) {
-          addToSavings(monthlyAutomaticSavings, new Date().toISOString());
-        }
+      // Se oggi è la fine del periodo di risparmio
+      if (today.toDateString() === endDate.toDateString()) {
+        const todayStr = today.toISOString().split('T')[0];
+        const alreadySavedToday = savingsHistory.some(entry => {
+          const entryDate = new Date(entry.date).toISOString().split('T')[0];
+          return entryDate === todayStr && entry.amount > 0;
+        });
         
-        // Aggiorna la data del prossimo stipendio
-        const nextMonth = new Date(payday);
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
-        setNextPaydayDate(nextMonth.toISOString().split('T')[0]);
-        setLastPaydayDate(today.toISOString().split('T')[0]);
+        if (!alreadySavedToday) {
+          const totalSavingsAmount = getMonthlySavingsAmount();
+          if (totalSavingsAmount > 0) {
+            addToSavings(totalSavingsAmount, new Date().toISOString());
+          }
+          
+          // Se c'è ripetizione, aggiorna al prossimo periodo
+          if (isRepeating) {
+            const start = new Date(savingsStartDate + 'T00:00:00');
+            const end = new Date(savingsEndDate + 'T00:00:00');
+            
+            let periodDays = 0;
+            const tempCurrent = new Date(start);
+            while (tempCurrent <= end) {
+              periodDays++;
+              tempCurrent.setDate(tempCurrent.getDate() + 1);
+            }
+            
+            const nextStart = new Date(end);
+            nextStart.setDate(nextStart.getDate() + 1);
+            const nextEnd = new Date(nextStart);
+            nextEnd.setDate(nextEnd.getDate() + periodDays - 1);
+            
+            setSavingsStartDate(nextStart.toISOString().split('T')[0]);
+            setSavingsEndDate(nextEnd.toISOString().split('T')[0]);
+          }
+        }
       }
     }
-  }, [nextPaydayDate, monthlyIncome, savingsPercentage, addToSavings, setNextPaydayDate, setLastPaydayDate]);
+  }, [savingsPeriod, savingsEndDate, savingsStartDate, getMonthlySavingsAmount, savingsHistory]);
 
   // Statistiche
   const getMonthlyStats = () => {
@@ -327,8 +662,16 @@ export const AppProvider = ({ children }) => {
       monthlyIncome, setMonthlyIncome,
       lastPaydayDate, setLastPaydayDate,
       nextPaydayDate, setNextPaydayDate,
+      paymentType, setPaymentType,
+      customStartDate, setCustomStartDate,
+      customEndDate, setCustomEndDate,
       fixedExpenses, setFixedExpenses,
       savingsPercentage, setSavingsPercentage,
+      savingsMode, setSavingsMode,
+      savingsPeriod, setSavingsPeriod,
+      savingsFixedAmount, setSavingsFixedAmount,
+      savingsStartDate, setSavingsStartDate,
+      savingsEndDate, setSavingsEndDate,
       transactions, setTransactions,
       savingsHistory, setSavingsHistory,
       totalSavings, setTotalSavings,
@@ -355,6 +698,10 @@ export const AppProvider = ({ children }) => {
       getDaysUntilPayday,
       getMonthlyAvailability,
       getDailyFutureExpenses,
+      getDaysInPaymentPeriod,
+      getDaysInSavingsPeriod,
+      getDailySavingsAmount,
+      getMonthlySavingsAmount,
       getMonthlyStats,
       getWeeklyComparison,
       addToSavings,

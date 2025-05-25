@@ -1,29 +1,21 @@
-import React, { useContext, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useContext } from 'react';
+import { motion } from 'framer-motion';
 import {
   Settings,
   Moon,
   Sun,
-  Bell,
   Globe,
-  Key,
-  HelpCircle,
-  LogOut,
   ChevronRight,
   Wallet,
   PiggyBank,
   Calculator,
-  Shield,
-  Info,
-  Smartphone,
+  RefreshCw,
 } from 'lucide-react';
 import { AppContext } from '../context/AppContext';
 
 const SettingsPage = () => {
   const { theme, userSettings, setUserSettings, setCurrentView } =
     useContext(AppContext);
-
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Animazioni
   const containerVariants = {
@@ -56,11 +48,13 @@ const SettingsPage = () => {
     }));
   };
 
-  const toggleNotifications = () => {
-    setUserSettings((prev) => ({
-      ...prev,
-      notifications: !prev.notifications,
-    }));
+  const resetOnboarding = () => {
+    if (confirm('Sei sicuro di voler riconfigurare tutto da capo? Tutti i dati attuali verranno persi.')) {
+      // Rimuovi il flag di onboarding completato
+      localStorage.removeItem('onboardingCompleted');
+      // Ricarica la pagina per mostrare l'onboarding
+      window.location.reload();
+    }
   };
 
   const SettingItem = ({
@@ -226,7 +220,7 @@ const SettingsPage = () => {
             marginBottom: '16px',
           }}
         >
-          Account e Preferenze
+          Preferenze
         </motion.h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -243,33 +237,11 @@ const SettingsPage = () => {
           />
 
           <SettingItem
-            icon={Bell}
-            title="Notifiche"
-            description={
-              userSettings.notifications
-                ? 'Notifiche attive'
-                : 'Notifiche disattivate'
-            }
-            action={toggleNotifications}
-            toggle={true}
-            toggleValue={userSettings.notifications}
-            color="#F59E0B"
-          />
-
-          <SettingItem
             icon={Globe}
             title="Lingua"
             description="Italiano"
             action={() => {}}
             color="#10B981"
-          />
-
-          <SettingItem
-            icon={Key}
-            title="Privacy e Sicurezza"
-            description="Gestisci PIN e backup"
-            action={() => {}}
-            color="#EF4444"
           />
         </div>
       </motion.div>
@@ -336,7 +308,7 @@ const SettingsPage = () => {
               <div>
                 <p style={{ fontWeight: '500', color: theme.text }}>Entrate</p>
                 <p style={{ fontSize: '14px', color: theme.textSecondary }}>
-                  Modifica le tue entrate mensili
+                  Modifica il tuo periodo di pagamento
                 </p>
               </div>
             </div>
@@ -433,7 +405,7 @@ const SettingsPage = () => {
         </div>
       </motion.div>
 
-      {/* Supporto e Info */}
+      {/* Gestione Dati */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -455,170 +427,56 @@ const SettingsPage = () => {
             marginBottom: '16px',
           }}
         >
-          Supporto e Informazioni
+          Gestione Dati
         </motion.h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <SettingItem
-            icon={HelpCircle}
-            title="Guide e Tutorial"
-            description="Impara a usare l'app"
-            action={() => {}}
-            color="#8B5CF6"
-          />
-
           <motion.div
             variants={itemVariants}
+            whileHover={{ scale: 1.02, x: 10 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={resetOnboarding}
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
               padding: '16px',
               borderRadius: '16px',
               backgroundColor: theme.background,
-              border: `1px solid ${theme.border}`,
+              border: `1px solid ${theme.danger}`,
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div
+              <motion.div
+                whileHover={{ rotate: 360 }}
+                transition={{ duration: 0.5 }}
                 style={{
                   width: '40px',
                   height: '40px',
                   borderRadius: '12px',
-                  backgroundColor: `${theme.primary}15`,
+                  backgroundColor: `${theme.danger}15`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Info size={20} style={{ color: theme.primary }} />
-              </div>
+                <RefreshCw size={20} style={{ color: theme.danger }} />
+              </motion.div>
               <div>
                 <p style={{ fontWeight: '500', color: theme.text }}>
-                  Versione App
+                  Riconfigura Budget
                 </p>
                 <p style={{ fontSize: '14px', color: theme.textSecondary }}>
-                  1.0.0
+                  Ricomincia da capo la configurazione
                 </p>
               </div>
             </div>
+            <ChevronRight size={20} style={{ color: theme.textSecondary }} />
           </motion.div>
-
-          <SettingItem
-            icon={Shield}
-            title="Privacy Policy"
-            description="Leggi la nostra privacy policy"
-            action={() => {}}
-            color="#059669"
-          />
-
-          <SettingItem
-            icon={Smartphone}
-            title="Info sul dispositivo"
-            description="Dettagli tecnici"
-            action={() => {}}
-            color="#3B82F6"
-          />
         </div>
-      </motion.div>
-
-      {/* Logout Button */}
-      <motion.div
-        variants={itemVariants}
-        initial="hidden"
-        animate="visible"
-        style={{ margin: '24px 16px', position: 'relative' }}
-      >
-        <AnimatePresence>
-          {showLogoutConfirm ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundColor: theme.card,
-                borderRadius: '16px',
-                padding: '20px',
-                zIndex: 10,
-                border: `1px solid ${theme.border}`,
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-              }}
-            >
-              <p
-                style={{
-                  fontSize: '16px',
-                  fontWeight: '500',
-                  color: theme.text,
-                  marginBottom: '16px',
-                  textAlign: 'center',
-                }}
-              >
-                Sei sicuro di voler uscire?
-              </p>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    localStorage.clear();
-                    window.location.reload();
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    borderRadius: '12px',
-                    backgroundColor: theme.danger,
-                    color: 'white',
-                    fontWeight: '600',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Esci
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setShowLogoutConfirm(false)}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    borderRadius: '12px',
-                    backgroundColor: theme.background,
-                    color: theme.textSecondary,
-                    fontWeight: '600',
-                    border: `1px solid ${theme.border}`,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Annulla
-                </motion.button>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowLogoutConfirm(true)}
-              style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '16px',
-                backgroundColor: `${theme.danger}15`,
-                color: theme.danger,
-                fontWeight: '600',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              <LogOut size={20} />
-              Esci
-            </motion.button>
-          )}
-        </AnimatePresence>
       </motion.div>
 
       {/* Developer Credits */}

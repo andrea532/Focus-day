@@ -1,284 +1,541 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Calendar, Minus, X, TrendingUp, TrendingDown, Flame, Receipt, PiggyBank } from 'lucide-react';
+import { Plus, Minus, Calendar, PiggyBank, ArrowLeft, Check } from 'lucide-react';
 import { AppContext } from '../context/AppContext';
 import SavingsOverlay from './SavingsOverlay';
 
-// Componente Batteria Realistica (con colori del tema)
-const RealisticBattery = ({ day, amount, maxAmount = 200, delay }) => {
+// Componente per visualizzare il budget giornaliero in modo molto semplice
+const BudgetIndicator = ({ day, amount }) => {
   const { theme } = useContext(AppContext);
-  const percentage = Math.max(0, Math.min(100, (amount / maxAmount) * 100));
   const isPositive = amount >= 0;
-  
-  // Usa i colori del tema
-  const getBatteryColor = () => {
-    if (!isPositive) return theme.danger;
-    if (percentage >= 60) return theme.secondary;
-    if (percentage >= 30) return theme.warning;
-    return theme.danger;
-  };
-  
-  const batteryColor = getBatteryColor();
   
   return (
     <motion.div
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay: delay * 0.2, type: 'spring', stiffness: 300, damping: 30 }}
-      style={{ flex: 1, textAlign: 'center', padding: '0 10px' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      style={{ 
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '4px'
+      }}
     >
-      {/* Giorno */}
-      <p style={{ 
-        fontSize: '14px', 
-        color: theme.textSecondary,
-        marginBottom: '12px',
-        fontWeight: '600'
+      <span style={{ fontWeight: '500', color: theme.textSecondary, fontSize: '14px' }}>{day}</span>
+      <span style={{ 
+        fontWeight: '700', 
+        fontSize: '20px',
+        color: isPositive ? theme.secondary : theme.danger 
       }}>
-        {day}
-      </p>
-      
-      {/* Container della batteria */}
-      <div style={{ 
-        position: 'relative', 
-        width: '80px', 
-        height: '160px', 
-        margin: '0 auto',
-        perspective: '1000px'
+        € {Math.abs(amount).toFixed(2)}
+      </span>
+    </motion.div>
+  );
+};
+
+// Componente per il form a schermo intero
+const TransactionFormFullscreen = ({ isOpen, onClose, initialType, onSave }) => {
+  const { theme, categories } = useContext(AppContext);
+  const [currentStep, setCurrentStep] = useState(1); // 1: Seleziona categoria, 2: Inserisci dettagli
+  const [transactionType, setTransactionType] = useState(initialType || 'expense');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  
+  // Controlla la dimensione dello schermo
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setScreenWidth(window.innerWidth);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => {
+      window.removeEventListener('resize', checkScreenSize);
+    };
+  }, []);
+
+  // Determinare il layout in base alla dimensione dello schermo
+  const isDesktop = screenWidth > 768;
+  const isMobile = screenWidth <= 480;
+  const isVerySmall = screenWidth <= 360;
+
+  // Reset del form quando si apre
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep(1);
+      setSelectedCategory(null);
+      setAmount('');
+      setDescription('');
+      setTransactionType(initialType || 'expense');
+    }
+  }, [isOpen, initialType]);
+
+  // Se non è aperto, non renderizziamo nulla
+  if (!isOpen) return null;
+  
+  // Formattazione stile bancario - numeri inseriti da destra e decimali automatici
+  const formatAmount = (value) => {
+    if (!value) return '';
+    
+    // Rimuovi tutti i caratteri non numerici
+    const numericValue = value.replace(/[^0-9]/g, '');
+    
+    // Converti in centesimi (sempre con 2 decimali)
+    const cents = parseInt(numericValue, 10);
+    
+    // Converti in formato euro con virgola
+    const euros = (cents / 100).toFixed(2).replace('.', ',');
+    
+    // Aggiungi separatore delle migliaia
+    return euros.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  // Gestione categoria selezionata
+  const handleSelectCategory = (category) => {
+    setSelectedCategory(category);
+    setCurrentStep(2); // Passa al secondo step
+  };
+  
+  // Torna al primo step
+  const handleBack = () => {
+    setCurrentStep(1);
+  };
+  
+  // Gestione salvataggio - Per stile bancario
+  const handleSave = () => {
+    if (!amount) return;
+    
+    // Converti i centesimi in euro
+    const numericAmount = parseInt(amount, 10) / 100;
+    
+    // Chiamare la funzione onSave passata come prop
+    onSave({
+      type: transactionType,
+      categoryId: selectedCategory.id,
+      amount: numericAmount,
+      description: description || ''
+    });
+
+    // Chiudi il form
+    onClose();
+  };
+
+  // Filtro le categorie in base al tipo di transazione
+  const filteredCategories = categories.filter(cat => 
+    transactionType === 'expense' ? cat.id <= 20 : cat.id >= 21
+  );
+
+  // Calcola il numero di colonne in base alla dimensione dello schermo
+  const getGridColumns = () => {
+    if (isDesktop) return 'repeat(4, 1fr)';
+    if (isVerySmall) return 'repeat(2, 1fr)';
+    return 'repeat(3, 1fr)';
+  };
+
+  // Gestiamo anche l'input per prevenire divisioni automatiche
+  return (
+    <div style={{ 
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: theme.background,
+      zIndex: 50,
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      width: '100%',
+      maxWidth: isDesktop ? '100%' : '428px',
+      margin: '0 auto',
+      overflow: 'hidden'
+    }}>
+      {/* Header */}
+      <header style={{ 
+        padding: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+        borderBottom: `1px solid ${theme.border}`,
+        backgroundColor: theme.card,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        position: 'relative',
+        zIndex: 2
       }}>
-        {/* Batteria 3D */}
-        <div style={{
-          width: '100%',
-          height: '100%',
-          position: 'relative',
-          transformStyle: 'preserve-3d',
-          transform: 'rotateY(10deg)'
+        {currentStep === 1 ? (
+          <button
+            onClick={onClose}
+            style={{
+              padding: isVerySmall ? '2px 4px' : isMobile ? '4px 8px' : '8px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: theme.textSecondary,
+              fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            Annulla
+          </button>
+        ) : (
+          <button
+            onClick={handleBack}
+            style={{
+              padding: isVerySmall ? '2px 4px' : isMobile ? '4px 8px' : '8px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: theme.primary,
+              fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: isVerySmall ? '2px' : '4px'
+            }}
+          >
+            <ArrowLeft size={isVerySmall ? 14 : isMobile ? 16 : 18} />
+            {!isVerySmall && "Indietro"}
+          </button>
+        )}
+
+        <h2 style={{
+          fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+          fontWeight: '600',
+          color: theme.text,
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: isVerySmall ? '150px' : isMobile ? '200px' : '300px'
         }}>
-          {/* Corpo principale della batteria */}
-          <div style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: '16px',
-            position: 'relative',
-            background: theme.card,
-            boxShadow: `
-              0 10px 30px rgba(0,0,0,0.1),
-              inset 0 2px 2px rgba(255,255,255,0.1),
-              inset 0 -2px 2px rgba(0,0,0,0.05)
-            `,
-            border: `2px solid ${theme.border}`,
-            overflow: 'hidden'
-          }}>
-            {/* Terminale superiore della batteria */}
-            <div style={{
-              position: 'absolute',
-              top: '-12px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '40px',
-              height: '12px',
-              background: theme.textSecondary,
-              borderRadius: '6px 6px 0 0',
-              boxShadow: '0 -2px 4px rgba(0,0,0,0.1)',
-              border: `1px solid ${theme.border}`
-            }}>
-              {/* Dettaglio metallico sul terminale */}
-              <div style={{
-                position: 'absolute',
-                top: '3px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '20px',
-                height: '2px',
-                backgroundColor: theme.background,
-                boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.2)'
-              }} />
-            </div>
-            
-            {/* Area di visualizzazione trasparente */}
-            <div style={{
-              position: 'absolute',
-              top: '10px',
-              left: '10px',
-              right: '10px',
-              bottom: '10px',
-              borderRadius: '12px',
-              backgroundColor: theme.background,
-              overflow: 'hidden',
-              boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)'
-            }}>
-              {/* Livello di carica */}
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: `${percentage}%` }}
-                transition={{ 
-                  duration: 1.5, 
-                  ease: "easeInOut", 
-                  delay: delay * 0.3 
-                }}
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  background: `linear-gradient(180deg, 
-                    ${batteryColor} 0%, 
-                    ${batteryColor}DD 50%,
-                    ${batteryColor}99 100%)`,
-                  borderRadius: '0 0 10px 10px',
-                  boxShadow: `
-                    0 0 20px ${batteryColor}66,
-                    inset 0 0 10px ${batteryColor}AA
-                  `
-                }}
-              >
-                {/* Effetto luminoso animato */}
-                <motion.div
-                  animate={{
-                    opacity: [0.3, 0.6, 0.3],
-                    y: [-10, 0, -10]
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '30px',
-                    background: `linear-gradient(180deg, 
-                      rgba(255,255,255,0.4) 0%, 
-                      transparent 100%)`,
-                    filter: 'blur(8px)'
-                  }}
-                />
-                
-                {/* Bolle animate (solo quando sta caricando) */}
-                {percentage > 0 && percentage < 100 && (
-                  <>
-                    {[...Array(3)].map((_, i) => (
-                      <motion.div
-                        key={i}
-                        animate={{
-                          y: [-20, -140],
-                          x: [0, Math.random() * 20 - 10],
-                          scale: [0.5, 1, 0.3],
-                          opacity: [0, 0.7, 0]
-                        }}
-                        transition={{
-                          duration: 3,
-                          repeat: Infinity,
-                          delay: i * 0.7,
-                          ease: "easeOut"
-                        }}
-                        style={{
-                          position: 'absolute',
-                          bottom: '10px',
-                          left: `${30 + i * 20}%`,
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: 'rgba(255,255,255,0.6)',
-                          boxShadow: '0 0 4px rgba(255,255,255,0.4)'
-                        }}
-                      />
-                    ))}
-                  </>
-                )}
-              </motion.div>
-              
-              {/* Importo al centro della batteria */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: delay * 0.5 }}
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  fontSize: '22px',
-                  fontWeight: '700',
-                  color: theme.text,
-                  textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  backgroundColor: `${theme.card}ee`,
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  backdropFilter: 'blur(4px)',
-                  whiteSpace: 'nowrap',
-                  minWidth: '60px',
-                  textAlign: 'center',
-                  border: `1px solid ${theme.border}`
-                }}
-              >
-                € {Math.abs(amount).toFixed(0)}
-              </motion.div>
-              
-              {/* Linee di livello */}
-              {[25, 50, 75].map((level) => (
-                <div
-                  key={level}
-                  style={{
-                    position: 'absolute',
-                    bottom: `${level}%`,
-                    left: 0,
-                    right: 0,
-                    height: '1px',
-                    backgroundColor: theme.border
-                  }}
-                />
-              ))}
-            </div>
-            
-            {/* Riflesso sulla batteria */}
-            <div style={{
-              position: 'absolute',
-              top: '15px',
-              left: '15px',
-              width: '25px',
-              height: '60px',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%)',
+          {currentStep === 1 
+            ? (transactionType === 'expense' ? 'Nuova Spesa' : 'Nuova Entrata')
+            : selectedCategory?.name
+          }
+        </h2>
+
+        {currentStep === 2 ? (
+          <button
+            onClick={handleSave}
+            disabled={!amount}
+            style={{
+              padding: isVerySmall ? '2px 4px' : isMobile ? '4px 8px' : '8px 16px',
+              backgroundColor: amount 
+                ? (transactionType === 'expense' ? theme.danger : theme.secondary)
+                : theme.border,
+              border: 'none',
               borderRadius: '8px',
-              transform: 'skewY(-20deg)',
-              filter: 'blur(2px)'
-            }} />
-            
-            {/* Indicatore di carica (fulmine) */}
-            {percentage > 0 && percentage < 100 && (
-              <motion.div
-                animate={{
-                  opacity: [0.5, 1, 0.5],
-                  scale: [0.8, 1, 0.8]
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-                style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  backgroundColor: theme.card,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: `0 0 10px ${theme.primary}40`,
-                  border: `1px solid ${theme.border}`
-                }}
-              >
-                <span style={{ fontSize: '14px' }}>⚡</span>
-              </motion.div>
-            )}
+              color: 'white',
+              fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
+              fontWeight: '600',
+              cursor: amount ? 'pointer' : 'not-allowed',
+              opacity: amount ? 1 : 0.5,
+              display: 'flex',
+              alignItems: 'center',
+              gap: isVerySmall ? '2px' : '4px'
+            }}
+          >
+            <Check size={isVerySmall ? 14 : isMobile ? 16 : 18} />
+            Salva
+          </button>
+        ) : (
+          <div style={{ width: isVerySmall ? '50px' : isMobile ? '60px' : '80px' }} />
+        )}
+      </header>
+
+      {/* Tipo di transazione (solo nel primo step) */}
+      {currentStep === 1 && (
+        <div style={{
+          display: 'flex',
+          padding: isVerySmall ? '6px 8px' : isMobile ? '8px 12px' : '12px 16px',
+          backgroundColor: theme.card,
+          borderBottom: `1px solid ${theme.border}`,
+        }}>
+          <div style={{
+            display: 'flex',
+            backgroundColor: theme.background,
+            borderRadius: '8px',
+            padding: '4px',
+            width: '100%'
+          }}>
+            <button
+              onClick={() => setTransactionType('expense')}
+              style={{
+                flex: 1,
+                padding: isVerySmall ? '6px 2px' : isMobile ? '8px 4px' : '12px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: transactionType === 'expense' ? theme.card : 'transparent',
+                color: transactionType === 'expense' ? theme.danger : theme.textSecondary,
+                fontWeight: '600',
+                fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: isVerySmall ? '2px' : isMobile ? '4px' : '8px'
+              }}
+            >
+              <Minus size={isVerySmall ? 14 : isMobile ? 16 : 18} />
+              Spesa
+            </button>
+            <button
+              onClick={() => setTransactionType('income')}
+              style={{
+                flex: 1,
+                padding: isVerySmall ? '6px 2px' : isMobile ? '8px 4px' : '12px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: transactionType === 'income' ? theme.card : 'transparent',
+                color: transactionType === 'income' ? theme.secondary : theme.textSecondary,
+                fontWeight: '600',
+                fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: isVerySmall ? '2px' : isMobile ? '4px' : '8px'
+              }}
+            >
+              <Plus size={isVerySmall ? 14 : isMobile ? 16 : 18} />
+              Entrata
+            </button>
           </div>
         </div>
-      </div>
-    </motion.div>
+      )}
+
+      {/* Contenuto dinamico in base allo step */}
+      <AnimatePresence mode="wait">
+        {/* Step 1: Seleziona categoria */}
+        {currentStep === 1 && (
+          <motion.div
+            key="step1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              padding: isVerySmall ? '12px 8px' : isMobile ? '16px 12px' : '20px 16px',
+              overflowY: 'auto',
+              flex: 1
+            }}
+          >
+            <h3 style={{ 
+              fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px', 
+              fontWeight: '600', 
+              color: theme.text,
+              marginBottom: isVerySmall ? '8px' : isMobile ? '12px' : '20px' 
+            }}>
+              Seleziona una categoria
+            </h3>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: getGridColumns(),
+              gap: isVerySmall ? '6px' : isMobile ? '8px' : isDesktop ? '24px' : '16px',
+              width: '100%'
+            }}>
+              {filteredCategories.map((category) => (
+                <motion.div
+                  key={category.id}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleSelectCategory(category)}
+                  style={{
+                    backgroundColor: theme.card,
+                    borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                    padding: isVerySmall ? '8px 2px' : isMobile ? '12px 4px' : '20px 8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: isVerySmall ? '4px' : isMobile ? '8px' : '12px',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                    border: `1px solid ${theme.card}`,
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <div style={{ 
+                    fontSize: isVerySmall ? '20px' : isMobile ? '28px' : '36px',
+                    width: isVerySmall ? '28px' : isMobile ? '40px' : '60px',
+                    height: isVerySmall ? '28px' : isMobile ? '40px' : '60px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: `${category.color}15`,
+                    borderRadius: '50%'
+                  }}>
+                    {category.icon}
+                  </div>
+                  <span style={{ 
+                    fontSize: isVerySmall ? '10px' : isMobile ? '12px' : '16px', 
+                    fontWeight: '500',
+                    color: theme.text,
+                    textAlign: 'center',
+                    lineHeight: '1.2',
+                    // Truncate text if too long for small screens
+                    width: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: isVerySmall ? '-webkit-box' : 'block',
+                    WebkitLineClamp: isVerySmall ? 2 : 'unset',
+                    WebkitBoxOrient: isVerySmall ? 'vertical' : 'unset'
+                  }}>
+                    {category.name}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+        
+        {/* Step 2: Inserisci importo e descrizione */}
+        {currentStep === 2 && selectedCategory && (
+          <motion.div
+            key="step2"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            style={{
+              padding: isVerySmall ? '12px 8px' : isMobile ? '16px 12px' : isDesktop ? '32px 24px' : '24px 16px',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: isVerySmall ? '16px' : isMobile ? '24px' : '32px',
+              overflowY: 'auto',
+              maxWidth: isDesktop ? '800px' : '100%',
+              margin: isDesktop ? '0 auto' : '0'
+            }}
+          >
+            {/* Categoria selezionata */}
+            <div style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              gap: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+              padding: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+              backgroundColor: `${selectedCategory.color}10`,
+              borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+              border: `1px solid ${selectedCategory.color}30`
+            }}>
+              <div style={{
+                fontSize: isVerySmall ? '20px' : isMobile ? '28px' : '36px',
+                width: isVerySmall ? '36px' : isMobile ? '48px' : '64px',
+                height: isVerySmall ? '36px' : isMobile ? '48px' : '64px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: `${selectedCategory.color}20`,
+                borderRadius: '50%'
+              }}>
+                {selectedCategory.icon}
+              </div>
+              <div>
+                <p style={{ 
+                  fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px', 
+                  color: theme.textSecondary 
+                }}>
+                  Categoria selezionata
+                </p>
+                <p style={{ 
+                  fontSize: isVerySmall ? '16px' : isMobile ? '18px' : '20px', 
+                  fontWeight: '600',
+                  color: theme.text
+                }}>
+                  {selectedCategory.name}
+                </p>
+              </div>
+            </div>
+            
+            {/* Importo */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+                fontWeight: '600',
+                color: theme.text,
+                marginBottom: isVerySmall ? '6px' : isMobile ? '8px' : '12px'
+              }}>
+                Importo
+              </label>
+              
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: theme.card,
+                borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                padding: isVerySmall ? '12px 8px' : isMobile ? '16px 12px' : '24px 20px',
+                gap: isVerySmall ? '6px' : isMobile ? '8px' : '12px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+              }}>
+                <span style={{
+                  fontSize: isVerySmall ? '28px' : isMobile ? '32px' : '40px',
+                  fontWeight: '700',
+                  color: transactionType === 'expense' ? theme.danger : theme.secondary
+                }}>
+                  €
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formatAmount(amount)}
+                  onChange={(e) => {
+                    // Estrai solo i numeri e gestisci l'input come centesimi
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    setAmount(numericValue);
+                  }}
+                  placeholder="0,00"
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: isVerySmall ? '28px' : isMobile ? '32px' : '40px',
+                    fontWeight: '700',
+                    color: theme.text,
+                    width: '100%'
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+            
+            {/* Descrizione */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+                fontWeight: '600',
+                color: theme.text,
+                marginBottom: isVerySmall ? '6px' : isMobile ? '8px' : '12px'
+              }}>
+                Descrizione
+              </label>
+              
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={transactionType === 'expense' ? "Cosa hai comprato?" : "Da dove arriva?"}
+                style={{
+                  width: '100%',
+                  padding: isVerySmall ? '12px' : isMobile ? '16px' : '20px',
+                  borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                  backgroundColor: theme.card,
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+                  color: theme.text,
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+                }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 
@@ -289,7 +546,6 @@ const Dashboard = () => {
     calculateDailyBudget, 
     getBudgetSurplus,
     addTransaction,
-    setCurrentView,
     getDaysUntilPayday,
     nextPaydayDate,
     getMonthlyAvailability,
@@ -298,58 +554,81 @@ const Dashboard = () => {
     monthlyIncome,
     fixedExpenses,
     savingsPercentage,
-    getDailyFutureExpenses
+    paymentType,
+    customStartDate,
+    customEndDate,
   } = useContext(AppContext);
 
-  const [newTransaction, setNewTransaction] = useState({
-    amount: '',
-    categoryId: 1,
-    description: '',
-    date: new Date().toISOString().split('T')[0],
-    type: 'expense'
-  });
-
-  const [showAddTransaction, setShowAddTransaction] = useState(false);
-  const [transactionType, setTransactionType] = useState('expense');
-  const [showSavingsOverlay, setShowSavingsOverlay] = useState(false);
-
-  // Formattazione importo
-  const formatAmount = (value) => {
-    if (!value) return '';
-    const numValue = parseInt(value, 10);
-    const formatted = (numValue / 100).toFixed(2);
-    return formatted.replace('.', ',');
-  };
-
-  // Calcoli budget
+  // Stati per il budget e animazioni
   const dailyBudget = calculateDailyBudget();
-  const budgetSurplus = getBudgetSurplus();
+  const [budgetSurplus, setBudgetSurplus] = useState(getBudgetSurplus());
+  
+  // Stato per l'animazione delle transazioni
+  const [lastTransaction, setLastTransaction] = useState(null);
+  const [showTransactionEffect, setShowTransactionEffect] = useState(false);
+  const [showSavingsOverlay, setShowSavingsOverlay] = useState(false);
+  
+  // Stato per il form di transazione
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [transactionType, setTransactionType] = useState('expense');
+  const [showQuickActions, setShowQuickActions] = useState(false);
+
+  // Impedisci lo scorrimento quando la pagina è attiva
+  useEffect(() => {
+    // Salva lo stile originale per ripristinarlo in seguito
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    
+    // Funzione per prevenire lo scorrimento
+    const preventDefault = (e) => {
+      e.preventDefault();
+    };
+    
+    // Applica stile per impedire lo scorrimento
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    
+    // Aggiungi listener per prevenire eventi di scorrimento
+    document.addEventListener('wheel', preventDefault, { passive: false });
+    document.addEventListener('touchmove', preventDefault, { passive: false });
+    
+    // Cleanup quando il componente viene smontato
+    return () => {
+      document.body.style.overflow = originalStyle;
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      document.removeEventListener('wheel', preventDefault);
+      document.removeEventListener('touchmove', preventDefault);
+    };
+  }, []);
   
   // Calcolo budget per i prossimi giorni
   const tomorrowBudget = dailyBudget + budgetSurplus;
   const afterTomorrowBudget = tomorrowBudget + dailyBudget;
 
-  // Dati per le batterie
+  // Dati per gli indicatori
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const afterTomorrow = new Date(today);
   afterTomorrow.setDate(afterTomorrow.getDate() + 2);
 
-  const batteryData = [
+  const budgetData = [
     {
       day: 'Oggi',
-      amount: budgetSurplus
+      amount: budgetSurplus,
     },
     {
       day: tomorrow.toLocaleDateString('it-IT', { weekday: 'short' }).charAt(0).toUpperCase() + 
            tomorrow.toLocaleDateString('it-IT', { weekday: 'short' }).slice(1),
-      amount: tomorrowBudget
+      amount: tomorrowBudget,
     },
     {
       day: afterTomorrow.toLocaleDateString('it-IT', { weekday: 'short' }).charAt(0).toUpperCase() + 
            afterTomorrow.toLocaleDateString('it-IT', { weekday: 'short' }).slice(1),
-      amount: afterTomorrowBudget
+      amount: afterTomorrowBudget,
     }
   ];
 
@@ -358,6 +637,52 @@ const Dashboard = () => {
     const totalFixedExpenses = fixedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     const savingsAmount = (monthlyIncome * savingsPercentage) / 100;
     
+    // Se abbiamo un periodo personalizzato, calcola in base a quello
+    const isRepeating = localStorage.getItem('incomeRepeating') === 'true';
+    
+    if (paymentType === 'custom' && customStartDate && customEndDate) {
+      const today = new Date();
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      
+      // Calcola il periodo corrente se c'è ripetizione
+      let currentPeriodStart = start;
+      let currentPeriodEnd = end;
+      
+      if (isRepeating && today > end) {
+        const periodDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        const daysPassed = Math.ceil((today - end) / (1000 * 60 * 60 * 24));
+        const periodsToAdd = Math.ceil(daysPassed / periodDays);
+        
+        currentPeriodStart = new Date(start);
+        currentPeriodStart.setDate(currentPeriodStart.getDate() + (periodDays * periodsToAdd));
+        currentPeriodEnd = new Date(end);
+        currentPeriodEnd.setDate(currentPeriodEnd.getDate() + (periodDays * periodsToAdd));
+      }
+      
+      // Filtra le transazioni del periodo corrente
+      const periodExpenses = transactions
+        .filter(t => {
+          const tDate = new Date(t.date);
+          return t.type === 'expense' && 
+                 tDate >= currentPeriodStart && 
+                 tDate <= currentPeriodEnd;
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const periodIncome = transactions
+        .filter(t => {
+          const tDate = new Date(t.date);
+          return t.type === 'income' && 
+                 tDate >= currentPeriodStart && 
+                 tDate <= currentPeriodEnd;
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      return monthlyIncome + periodIncome - totalFixedExpenses - savingsAmount - periodExpenses;
+    }
+    
+    // Comportamento normale per periodi mensili
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
@@ -386,51 +711,55 @@ const Dashboard = () => {
   const daysUntilPayday = getDaysUntilPayday();
 
   // Gestione transazioni
-  const handleAddTransaction = () => {
-    let amountValue = '';
-    if (newTransaction.amount) {
-      amountValue = (parseInt(newTransaction.amount, 10) / 100).toFixed(2);
-    }
-    
-    if (!amountValue || parseFloat(amountValue) <= 0) {
-      return;
-    }
-
-    let finalCategoryId = newTransaction.categoryId;
-    if (transactionType === 'income' && newTransaction.categoryId < 21) {
-      finalCategoryId = 21;
-    }
-
-    addTransaction({
-      amount: parseFloat(amountValue),
-      categoryId: finalCategoryId,
-      description: newTransaction.description,
-      date: newTransaction.date,
-      type: transactionType
-    });
-
-    setNewTransaction({
-      amount: '',
-      categoryId: transactionType === 'expense' ? 1 : 21,
-      description: '',
+  const handleAddTransaction = (transaction) => {
+    // Crea la transazione da aggiungere
+    const finalTransaction = {
+      amount: transaction.amount,
+      categoryId: transaction.categoryId,
+      description: transaction.description || '',
       date: new Date().toISOString().split('T')[0],
-      type: transactionType
+      type: transaction.type
+    };
+    
+    // Aggiorna il budget surplus in base alla transazione
+    const updatedBudget = transaction.type === 'expense' 
+      ? budgetSurplus - transaction.amount 
+      : budgetSurplus + transaction.amount;
+    
+    // Salva la transazione corrente per l'animazione
+    setLastTransaction({
+      amount: transaction.amount,
+      type: transaction.type,
+      category: categories.find(c => c.id === transaction.categoryId)
     });
+    
+    // Mostra l'effetto della transazione
+    setShowTransactionEffect(true);
+    
+    // Aggiorna il budget dopo un breve ritardo
+    setTimeout(() => {
+      // Aggiungi la transazione effettiva
+      addTransaction(finalTransaction);
+      
+      // Aggiorna il budget nella UI
+      setBudgetSurplus(updatedBudget);
+      
+      // Nascondi l'effetto dopo l'aggiornamento
+      setTimeout(() => {
+        setShowTransactionEffect(false);
+      }, 1500);
+    }, 300);
 
-    setShowAddTransaction(false);
+    // Chiudi il form
+    setShowTransactionForm(false);
+    setShowQuickActions(false);
   };
 
-  // Messaggio motivazionale
-  const getMotivationalMessage = () => {
-    if (budgetSurplus > dailyBudget) {
-      return "Fantastico! Stai risparmiando molto! 🎉";
-    } else if (budgetSurplus > 0) {
-      return "Ottimo lavoro! Continua così! 👍";
-    } else if (budgetSurplus === 0) {
-      return "Perfetto equilibrio! ⚖️";
-    } else {
-      return "Attenzione al budget di oggi! ⚠️";
-    }
+  // Gestione del click sul pulsante per aprire il form
+  const handleOpenForm = (type) => {
+    setTransactionType(type);
+    setShowTransactionForm(true);
+    setShowQuickActions(false);
   };
 
   return (
@@ -439,719 +768,289 @@ const Dashboard = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       style={{ 
-        paddingBottom: '120px',
-        background: `linear-gradient(180deg, ${theme.card} 0%, ${theme.background} 50%, ${theme.background} 100%)`,
-        minHeight: '100vh'
+        padding: '16px 16px 80px 16px',
+        backgroundColor: theme.background,
+        height: '100vh',
+        position: 'relative',
+        overflow: 'hidden'
       }}
     >
       {/* Savings Overlay */}
       <SavingsOverlay isOpen={showSavingsOverlay} onClose={() => setShowSavingsOverlay(false)} />
-
-      {/* Header con data, streak e saldo mensile */}
+      
+      {/* Form a schermo intero */}
+      <AnimatePresence>
+        {showTransactionForm && (
+          <TransactionFormFullscreen 
+            isOpen={showTransactionForm}
+            onClose={() => setShowTransactionForm(false)}
+            initialType={transactionType}
+            onSave={handleAddTransaction}
+          />
+        )}
+      </AnimatePresence>
+      
+      {/* Header con stipendio e saldo mensile */}
       <motion.div 
-        className="header"
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         style={{
-          padding: '16px',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          marginBottom: '24px'
         }}
       >
-        <div>
-          <p style={{ color: theme.textSecondary, fontSize: '14px' }}>
-            {new Date().toLocaleDateString('it-IT', { 
-              weekday: 'long', 
-              day: 'numeric', 
-              month: 'long' 
-            })}
-          </p>
-          {streak > 0 && (
-            <motion.div 
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                marginTop: '4px'
-              }}
-            >
-              <Flame size={16} style={{ color: theme.danger, marginRight: '4px' }} />
-              <span style={{ fontSize: '14px', fontWeight: '600', color: theme.danger }}>
-                {streak} giorni di streak!
-              </span>
-            </motion.div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Calendar size={16} style={{ color: theme.primary }} />
+          <span style={{ fontSize: '14px', color: theme.textSecondary }}>
+            {paymentType === 'custom' ? 'Fine periodo' : 'Stipendio'} tra {daysUntilPayday} giorni
+          </span>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowSavingsOverlay(true)}
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '12px',
-              background: `linear-gradient(135deg, ${theme.primary} 0%, #5A85FF 100%)`,
-              border: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(76, 111, 255, 0.3)',
-            }}
-          >
-            <PiggyBank size={22} color="white" />
-          </motion.button>
-          
           <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '12px', color: theme.textSecondary }}>Saldo mensile</p>
+            <span style={{ fontSize: '14px', color: theme.textSecondary }}>
+              Saldo {paymentType === 'custom' ? 'periodo' : 'mensile'}
+            </span>
             <p style={{ 
-              fontSize: '18px', 
+              fontSize: '16px', 
               fontWeight: '700', 
               color: monthlyBalance >= 0 ? theme.secondary : theme.danger 
             }}>
               € {monthlyBalance.toFixed(2)}
             </p>
           </div>
+          
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowSavingsOverlay(true)}
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              backgroundColor: theme.primary,
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <PiggyBank size={20} color="white" />
+          </motion.button>
         </div>
       </motion.div>
 
-      {/* Titolo principale */}
+      {/* Saldo di oggi (grande) - senza bordi, posizionato più in basso */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         style={{
           textAlign: 'center',
-          padding: '0 16px',
-          marginBottom: '32px'
+          marginTop: '100px',
+          marginBottom: '36px',
+          position: 'relative'
         }}
       >
-        <h1 style={{ 
-          fontSize: '24px', 
+        <p style={{ 
+          fontSize: '16px', 
           fontWeight: '600', 
           color: theme.textSecondary,
           marginBottom: '8px'
         }}>
           Budget di Oggi
-        </h1>
-        <motion.p
-          key={budgetSurplus}
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          style={{
-            fontSize: '48px',
-            fontWeight: '700',
-            color: budgetSurplus >= 0 ? theme.secondary : theme.danger,
-            marginBottom: '8px'
-          }}
-        >
-          {budgetSurplus >= 0 ? '' : '-'}€ {Math.abs(budgetSurplus).toFixed(2)}
-        </motion.p>
-        <motion.p
-          animate={{ opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          style={{
-            fontSize: '14px',
-            fontWeight: '500',
-            color: budgetSurplus >= 0 ? theme.secondary : theme.warning
-          }}
-        >
-          {getMotivationalMessage()}
-        </motion.p>
-      </motion.div>
-
-      {/* Batterie realistiche */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-around',
-          padding: '20px 16px',
-          gap: '8px',
-          marginBottom: '24px'
-        }}
-      >
-        {batteryData.map((battery, index) => (
-          <RealisticBattery
-            key={battery.day}
-            day={battery.day}
-            amount={battery.amount}
-            delay={index}
-          />
-        ))}
-      </motion.div>
-
-      {/* Info prossimo stipendio */}
-      {nextPaydayDate && daysUntilPayday !== null && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.3 }}
-          style={{
-            margin: '16px',
-            padding: '16px',
-            borderRadius: '16px',
-            backgroundColor: `${theme.primary}10`,
-            border: `1px solid ${theme.primary}20`
-          }}
-        >
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Calendar size={20} style={{ color: theme.primary }} />
-              <div>
-                <p style={{ fontWeight: '500', color: theme.text }}>
-                  Prossimo stipendio
-                </p>
-                <p style={{ fontSize: '14px', color: theme.textSecondary }}>
-                  {new Date(nextPaydayDate).toLocaleDateString('it-IT', { 
-                    weekday: 'long', 
-                    day: 'numeric', 
-                    month: 'short' 
-                  })}
-                </p>
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '24px', fontWeight: '700', color: theme.primary }}>
-                {daysUntilPayday}
-              </p>
-              <p style={{ fontSize: '14px', color: theme.textSecondary }}>
-                {daysUntilPayday === 1 ? 'giorno' : 'giorni'}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Indicatore spese future */}
-      {getDailyFutureExpenses() > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.4 }}
-          style={{
-            margin: '16px',
-            padding: '16px',
-            borderRadius: '16px',
-            backgroundColor: `${theme.warning}10`,
-            border: `1px solid ${theme.warning}20`
-          }}
-        >
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Receipt size={20} style={{ color: theme.warning }} />
-              <div>
-                <p style={{ fontWeight: '500', color: theme.text }}>
-                  Accantonamento spese future
-                </p>
-                <p style={{ fontSize: '14px', color: theme.textSecondary }}>
-                  Sottratto automaticamente dal budget
-                </p>
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '20px', fontWeight: '700', color: theme.warning }}>
-                € {getDailyFutureExpenses().toFixed(2)}
-              </p>
-              <p style={{ fontSize: '14px', color: theme.textSecondary }}>
-                al giorno
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Fixed Action Buttons */}
-      <motion.div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        style={{
-          position: 'fixed',
-          bottom: '90px',
-          left: '0',
-          right: '0',
-          padding: '0 16px',
-          zIndex: 20
-        }}
-      >
+        </p>
+        
         <div style={{ 
-          maxWidth: '428px',
-          margin: '0 auto',
-          display: 'flex', 
-          gap: '12px' 
+          fontSize: '48px',
+          fontWeight: '700',
+          color: budgetSurplus >= 0 ? theme.secondary : theme.danger,
+          marginBottom: '8px',
+          position: 'relative'
         }}>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            style={{
-              flex: 1,
-              height: '56px',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontWeight: '600',
-              fontSize: '16px',
-              border: 'none',
-              background: `linear-gradient(135deg, ${theme.secondary} 0%, ${theme.secondary}CC 100%)`,
-              boxShadow: `0 4px 12px ${theme.secondary}40`
-            }}
-            onClick={() => {
-              setTransactionType('income');
-              setNewTransaction({...newTransaction, amount: '', categoryId: 21, type: 'income'});
-              setShowAddTransaction(true);
-            }}
-          >
-            <Plus size={22} style={{ marginRight: '8px' }} />
-            Entrata
-          </motion.button>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            style={{
-              flex: 1,
-              height: '56px',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontWeight: '600',
-              fontSize: '16px',
-              border: 'none',
-              background: `linear-gradient(135deg, ${theme.danger} 0%, ${theme.danger}CC 100%)`,
-              boxShadow: `0 4px 12px ${theme.danger}40`
-            }}
-            onClick={() => {
-              setTransactionType('expense');
-              setNewTransaction({...newTransaction, amount: '', categoryId: 1, type: 'expense'});
-              setShowAddTransaction(true);
-            }}
-          >
-            <Minus size={22} style={{ marginRight: '8px' }} />
-            Spesa
-          </motion.button>
+          {budgetSurplus >= 0 ? '' : '-'}€ {Math.abs(budgetSurplus).toFixed(2)}
+          
+          {/* Animazione di transazione */}
+          <AnimatePresence>
+            {showTransactionEffect && lastTransaction && (
+              <motion.div
+                initial={{ 
+                  opacity: 0, 
+                  y: lastTransaction.type === 'expense' ? -30 : 30,
+                  scale: 0.5 
+                }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0,
+                  scale: 1 
+                }}
+                exit={{ 
+                  opacity: 0,
+                  y: lastTransaction.type === 'expense' ? 30 : -30,
+                  scale: 0.5 
+                }}
+                transition={{ 
+                  duration: 0.5,
+                  type: 'spring',
+                  stiffness: 200 
+                }}
+                style={{
+                  position: 'absolute',
+                  top: lastTransaction.type === 'expense' ? '100%' : '-30%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: lastTransaction.type === 'expense' ? `${theme.danger}20` : `${theme.secondary}20`,
+                  color: lastTransaction.type === 'expense' ? theme.danger : theme.secondary,
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {lastTransaction.type === 'expense' ? <Minus size={16} /> : <Plus size={16} />}
+                € {lastTransaction.amount.toFixed(2)}
+                {lastTransaction.category && (
+                  <span style={{ fontSize: '16px' }}>{lastTransaction.category.icon}</span>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
 
-      {/* Bottom Sheet per aggiungere transazione */}
-      <AnimatePresence>
-        {showAddTransaction && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
-              exit={{ opacity: 0 }}
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'black',
-                zIndex: 40
-              }}
-              onClick={() => setShowAddTransaction(false)}
+      {/* Budget Indicators - in orizzontale senza bordi, posizionati in basso */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{
+          position: 'fixed',
+          bottom: '280px',
+          left: '16px',
+          right: '16px',
+          paddingBottom: '16px',
+          borderBottom: `1px solid ${theme.border}`
+        }}
+      >
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between',
+        }}>
+          {budgetData.map((budget) => (
+            <BudgetIndicator
+              key={budget.day}
+              day={budget.day}
+              amount={budget.amount}
             />
+          ))}
+        </div>
+      </motion.div>
 
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 500 }}
-              style={{
-                position: 'fixed',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                zIndex: 50,
-                maxWidth: '428px',
-                margin: '0 auto'
-              }}
-            >
-              <div style={{
-                backgroundColor: theme.card,
-                borderTopLeftRadius: '32px',
-                borderTopRightRadius: '32px',
-                height: '85vh',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}>
-                {/* Header con pulsante Salva */}
-                <div style={{ 
-                  padding: '16px 20px',
-                  borderBottom: `1px solid ${theme.border}`
-                }}>
-                  {/* Handle bar */}
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'center',
-                    marginBottom: '12px'
-                  }}>
-                    <div 
-                      style={{ 
-                        width: '48px',
-                        height: '5px',
-                        backgroundColor: theme.border,
-                        borderRadius: '3px',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setShowAddTransaction(false)}
-                    />
-                  </div>
+      {/* Fixed Action Button - pulsante + che apre altri due pulsanti a sinistra */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        style={{
+          position: 'fixed',
+          bottom: '120px',
+          right: '24px',
+          zIndex: 20,
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: '16px'
+        }}
+      >
+        <AnimatePresence>
+          {showQuickActions && (
+            <>
+              {/* Pulsante per Spesa (-) */}
+              <motion.button
+                initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                transition={{ delay: 0.05 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => handleOpenForm('expense')}
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  backgroundColor: theme.danger,
+                  color: 'white',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(255, 82, 82, 0.3)',
+                  cursor: 'pointer',
+                }}
+              >
+                <Minus size={22} />
+              </motion.button>
+              
+              {/* Pulsante per Entrata (+) */}
+              <motion.button
+                initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                transition={{ delay: 0.1 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => handleOpenForm('income')}
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  backgroundColor: theme.secondary,
+                  color: 'white',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(46, 204, 113, 0.3)',
+                  cursor: 'pointer',
+                }}
+              >
+                <Plus size={22} />
+              </motion.button>
+            </>
+          )}
+        </AnimatePresence>
 
-                  {/* Header con pulsanti */}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '12px'
-                  }}>
-                    <button
-                      onClick={() => setShowAddTransaction(false)}
-                      style={{
-                        padding: '8px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        color: theme.textSecondary,
-                        fontSize: '16px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Annulla
-                    </button>
-
-                    <h2 style={{
-                      fontSize: '17px',
-                      fontWeight: '600',
-                      color: theme.text
-                    }}>
-                      {transactionType === 'expense' ? 'Nuova Spesa' : 'Nuova Entrata'}
-                    </h2>
-
-                    <button
-                      onClick={handleAddTransaction}
-                      disabled={!newTransaction.amount || parseFloat(newTransaction.amount) <= 0}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: newTransaction.amount && parseFloat(newTransaction.amount) > 0
-                          ? (transactionType === 'expense' ? theme.danger : theme.secondary)
-                          : theme.border,
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: 'white',
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        cursor: newTransaction.amount && parseFloat(newTransaction.amount) > 0 ? 'pointer' : 'not-allowed',
-                        opacity: newTransaction.amount && parseFloat(newTransaction.amount) > 0 ? 1 : 0.5,
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      Salva
-                    </button>
-                  </div>
-
-                  {/* Tipo di transazione come tabs */}
-                  <div style={{
-                    display: 'flex',
-                    backgroundColor: theme.background,
-                    borderRadius: '12px',
-                    padding: '4px'
-                  }}>
-                    <button
-                      onClick={() => {
-                        setTransactionType('expense');
-                        setNewTransaction({...newTransaction, categoryId: 1, type: 'expense'});
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '8px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        backgroundColor: transactionType === 'expense' ? theme.card : 'transparent',
-                        color: transactionType === 'expense' ? theme.danger : theme.textSecondary,
-                        fontWeight: '600',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      Spesa
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTransactionType('income');
-                        setNewTransaction({...newTransaction, categoryId: 21, type: 'income'});
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '8px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        backgroundColor: transactionType === 'income' ? theme.card : 'transparent',
-                        color: transactionType === 'income' ? theme.secondary : theme.textSecondary,
-                        fontWeight: '600',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      Entrata
-                    </button>
-                  </div>
-                </div>
-
-                {/* Contenuto scrollabile */}
-                <div style={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  padding: '16px',
-                  paddingBottom: '32px'
-                }}>
-                  {/* Importo Input con formattazione automatica */}
-                  <div style={{ 
-                    marginBottom: '24px'
-                  }}>
-                    <div style={{
-                      backgroundColor: theme.background,
-                      borderRadius: '20px',
-                      padding: '20px',
-                      textAlign: 'center'
-                    }}>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: theme.textSecondary,
-                        marginBottom: '12px'
-                      }}>
-                        Importo
-                      </label>
-                      
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px',
-                        marginBottom: '12px'
-                      }}>
-                        <span style={{
-                          fontSize: '36px',
-                          fontWeight: '700',
-                          color: transactionType === 'expense' ? theme.danger : theme.secondary
-                        }}>
-                          €
-                        </span>
-                        <input
-                          type="tel"
-                          inputMode="numeric"
-                          value={formatAmount(newTransaction.amount)}
-                          onChange={(e) => {
-                            let value = e.target.value.replace(/[^0-9]/g, '');
-                            
-                            if (value === '') {
-                              setNewTransaction({...newTransaction, amount: ''});
-                              return;
-                            }
-                            
-                            if (value.length > 8) {
-                              value = value.slice(0, 8);
-                            }
-                            
-                            setNewTransaction({...newTransaction, amount: value});
-                          }}
-                          placeholder="0,00"
-                          style={{
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            outline: 'none',
-                            fontSize: '36px',
-                            fontWeight: '700',
-                            color: theme.text,
-                            width: '180px',
-                            textAlign: 'left',
-                            caretColor: transactionType === 'expense' ? theme.danger : theme.secondary
-                          }}
-                          autoFocus
-                        />
-                      </div>
-
-                      <input
-                        type="text"
-                        value={newTransaction.description}
-                        onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
-                        placeholder={transactionType === 'expense' ? "Cosa hai comprato?" : "Da dove arriva?"}
-                        style={{
-                          width: '100%',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          borderBottom: `1px solid ${theme.border}`,
-                          outline: 'none',
-                          textAlign: 'center',
-                          fontSize: '14px',
-                          color: theme.textSecondary,
-                          padding: '8px',
-                          caretColor: theme.primary
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Categorie */}
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      color: theme.textSecondary,
-                      marginBottom: '12px',
-                      paddingLeft: '4px'
-                    }}>
-                      Seleziona categoria
-                    </label>
-                    
-                    {/* Container scrollabile per le categorie */}
-                    <div style={{
-                      maxHeight: '300px',
-                      overflowY: 'auto',
-                      overflowX: 'hidden',
-                      paddingRight: '8px',
-                      WebkitOverflowScrolling: 'touch',
-                      scrollbarWidth: 'thin',
-                      scrollbarColor: `${theme.textSecondary} ${theme.background}`
-                    }}>
-                      <style>{`
-                        .categories-scroll::-webkit-scrollbar {
-                          width: 6px;
-                        }
-                        .categories-scroll::-webkit-scrollbar-track {
-                          background: ${theme.background};
-                          border-radius: 3px;
-                        }
-                        .categories-scroll::-webkit-scrollbar-thumb {
-                          background: ${theme.textSecondary};
-                          border-radius: 3px;
-                        }
-                        .categories-scroll::-webkit-scrollbar-thumb:hover {
-                          background: ${theme.text};
-                        }
-                      `}</style>
-                      
-                      <div 
-                        className="categories-scroll"
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(2, 1fr)',
-                          gap: '12px',
-                          paddingBottom: '8px'
-                        }}
-                      >
-                        {categories
-                          .filter(cat => transactionType === 'expense' ? cat.id <= 20 : cat.id >= 21)
-                          .map(category => (
-                            <motion.button
-                              key={category.id}
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => setNewTransaction({...newTransaction, categoryId: category.id})}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '16px',
-                                borderRadius: '16px',
-                                border: 'none',
-                                backgroundColor: parseInt(newTransaction.categoryId) === category.id 
-                                  ? `${category.color}20` 
-                                  : theme.background,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                borderWidth: '2px',
-                                borderStyle: 'solid',
-                                borderColor: parseInt(newTransaction.categoryId) === category.id 
-                                  ? category.color 
-                                  : 'transparent',
-                                gap: '12px',
-                                minHeight: '72px'
-                              }}
-                            >
-                              <div style={{
-                                fontSize: '28px',
-                                width: '36px',
-                                height: '36px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0
-                              }}>
-                                {category.icon}
-                              </div>
-                              <span style={{
-                                fontSize: '14px',
-                                fontWeight: '500',
-                                color: theme.text,
-                                textAlign: 'left',
-                                flex: 1,
-                                lineHeight: '1.2'
-                              }}>
-                                {category.name}
-                              </span>
-                            </motion.button>
-                          ))}
-                      </div>
-                    </div>
-                    
-                    {/* Indicatore di scroll */}
-                    {categories.filter(cat => transactionType === 'expense' ? cat.id <= 20 : cat.id >= 21).length > 6 && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.5 }}
-                        style={{
-                          textAlign: 'center',
-                          marginTop: '8px',
-                          fontSize: '12px',
-                          color: theme.textSecondary,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <motion.div
-                          animate={{ y: [0, 5, 0] }}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                        >
-                          ↓
-                        </motion.div>
-                        Scorri per vedere più categorie
-                      </motion.div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+        {/* Pulsante principale */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowQuickActions(!showQuickActions)}
+          style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            backgroundColor: theme.primary,
+            color: 'white',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(76, 111, 255, 0.3)',
+            cursor: 'pointer',
+            transition: 'transform 0.3s ease',
+            transform: showQuickActions ? 'rotate(45deg)' : 'rotate(0deg)'
+          }}
+        >
+          <Plus size={24} />
+        </motion.button>
+      </motion.div>
     </motion.div>
   );
 };
