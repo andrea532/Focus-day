@@ -23,6 +23,8 @@ const TransactionItem = ({ transaction, theme, category, onEdit }) => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
       style={{
         backgroundColor: theme.card,
         borderRadius: '12px',
@@ -33,7 +35,8 @@ const TransactionItem = ({ transaction, theme, category, onEdit }) => {
         justifyContent: 'space-between',
         alignItems: 'center',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        cursor: 'pointer'
       }}
     >
       <div 
@@ -42,7 +45,6 @@ const TransactionItem = ({ transaction, theme, category, onEdit }) => {
           alignItems: 'center', 
           gap: '12px',
           width: '100%',
-          cursor: 'pointer'
         }}
         onClick={() => onEdit(transaction)}
       >

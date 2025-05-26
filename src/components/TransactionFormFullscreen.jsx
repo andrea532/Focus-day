@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, Trash, X, AlertTriangle, Plus, Minus, Check 
+  ArrowLeft, Trash2, X, AlertTriangle, Plus, Minus, Check 
 } from 'lucide-react';
 import { AppContext } from '../context/AppContext';
 
@@ -209,51 +209,29 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, initialData, 
         </h2>
 
         {currentStep === 2 && !showDeleteConfirm ? (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {initialData && (
-              <button
-                onClick={handleDelete}
-                style={{
-                  padding: isVerySmall ? '2px 4px' : isMobile ? '4px 8px' : '8px 16px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  color: theme.danger,
-                  fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <Trash size={isVerySmall ? 14 : isMobile ? 16 : 18} />
-              </button>
-            )}
-            
-            <button
-              onClick={handleSave}
-              disabled={!amount}
-              style={{
-                padding: isVerySmall ? '2px 4px' : isMobile ? '4px 8px' : '8px 16px',
-                backgroundColor: amount 
-                  ? (transactionType === 'expense' ? theme.danger : theme.secondary)
-                  : theme.border,
-                border: 'none',
-                borderRadius: '8px',
-                color: 'white',
-                fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
-                fontWeight: '600',
-                cursor: amount ? 'pointer' : 'not-allowed',
-                opacity: amount ? 1 : 0.5,
-                display: 'flex',
-                alignItems: 'center',
-                gap: isVerySmall ? '2px' : '4px'
-              }}
-            >
-              <Check size={isVerySmall ? 14 : isMobile ? 16 : 18} />
-              Salva
-            </button>
-          </div>
+          <button
+            onClick={handleSave}
+            disabled={!amount}
+            style={{
+              padding: isVerySmall ? '2px 4px' : isMobile ? '4px 8px' : '8px 16px',
+              backgroundColor: amount 
+                ? (transactionType === 'expense' ? theme.danger : theme.secondary)
+                : theme.border,
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px',
+              fontWeight: '600',
+              cursor: amount ? 'pointer' : 'not-allowed',
+              opacity: amount ? 1 : 0.5,
+              display: 'flex',
+              alignItems: 'center',
+              gap: isVerySmall ? '2px' : '4px'
+            }}
+          >
+            <Check size={isVerySmall ? 14 : isMobile ? 16 : 18} />
+            Salva
+          </button>
         ) : showDeleteConfirm ? (
           <button
             onClick={handleDelete}
@@ -271,7 +249,7 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, initialData, 
               gap: isVerySmall ? '2px' : '4px'
             }}
           >
-            <Trash size={isVerySmall ? 14 : isMobile ? 16 : 18} />
+            <Trash2 size={isVerySmall ? 14 : isMobile ? 16 : 18} />
             Elimina
           </button>
         ) : (
@@ -523,10 +501,10 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, initialData, 
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              gap: isVerySmall ? '16px' : isMobile ? '24px' : '32px',
               overflowY: 'auto',
               maxWidth: isDesktop ? '800px' : '100%',
-              margin: isDesktop ? '0 auto' : '0'
+              margin: isDesktop ? '0 auto' : '0',
+              width: '100%'
             }}
           >
             {/* Categoria selezionata */}
@@ -537,7 +515,8 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, initialData, 
               padding: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
               backgroundColor: `${selectedCategory.color}10`,
               borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
-              border: `1px solid ${selectedCategory.color}30`
+              border: `1px solid ${selectedCategory.color}30`,
+              marginBottom: isVerySmall ? '16px' : isMobile ? '24px' : '32px'
             }}>
               <div style={{
                 fontSize: isVerySmall ? '20px' : isMobile ? '28px' : '36px',
@@ -569,7 +548,7 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, initialData, 
             </div>
             
             {/* Importo */}
-            <div>
+            <div style={{ marginBottom: isVerySmall ? '16px' : isMobile ? '24px' : '32px' }}>
               <label style={{
                 display: 'block',
                 fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
@@ -621,7 +600,7 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, initialData, 
             </div>
             
             {/* Descrizione */}
-            <div>
+            <div style={{ marginBottom: isVerySmall ? '24px' : isMobile ? '32px' : '40px' }}>
               <label style={{
                 display: 'block',
                 fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
@@ -650,6 +629,50 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, initialData, 
                 }}
               />
             </div>
+
+            {/* Pulsante Elimina (solo se stiamo modificando) */}
+            {initialData && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  marginBottom: '40px'
+                }}
+              >
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowDeleteConfirm(true)}
+                  style={{
+                    width: '100%',
+                    padding: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+                    borderRadius: isVerySmall ? '10px' : '12px',
+                    backgroundColor: 'transparent',
+                    color: theme.danger,
+                    border: `2px solid ${theme.danger}`,
+                    fontSize: isVerySmall ? '15px' : isMobile ? '16px' : '18px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = theme.danger;
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = theme.danger;
+                  }}
+                >
+                  <Trash2 size={isVerySmall ? 16 : isMobile ? 18 : 20} />
+                  Elimina Transazione
+                </motion.button>
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

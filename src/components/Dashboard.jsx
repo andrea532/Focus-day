@@ -131,9 +131,9 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, onSave }) => 
 
   // Calcola il numero di colonne in base alla dimensione dello schermo
   const getGridColumns = () => {
-    if (isDesktop) return 'repeat(4, 1fr)';
-    if (isVerySmall) return 'repeat(2, 1fr)';
-    return 'repeat(3, 1fr)';
+    if (isDesktop) return 'repeat(5, 1fr)';
+    if (isVerySmall) return 'repeat(3, 1fr)';
+    return 'repeat(4, 1fr)';
   };
 
   // Gestiamo anche l'input per prevenire divisioni automatiche
@@ -163,7 +163,8 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, onSave }) => 
         alignItems: 'center',
         justifyContent: 'space-between',
         position: 'relative',
-        zIndex: 2
+        zIndex: 2,
+        flexShrink: 0
       }}>
         {currentStep === 1 ? (
           <button
@@ -255,6 +256,7 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, onSave }) => 
           padding: isVerySmall ? '6px 8px' : isMobile ? '8px 12px' : '12px 16px',
           backgroundColor: theme.card,
           borderBottom: `1px solid ${theme.border}`,
+          flexShrink: 0
         }}>
           <div style={{
             display: 'flex',
@@ -319,76 +321,81 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, onSave }) => 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             style={{
-              padding: isVerySmall ? '12px 8px' : isMobile ? '16px 12px' : '20px 16px',
+              flex: 1,
               overflowY: 'auto',
-              flex: 1
+              WebkitOverflowScrolling: 'touch',
+              position: 'relative'
             }}
           >
-            <h3 style={{ 
-              fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px', 
-              fontWeight: '600', 
-              color: theme.text,
-              marginBottom: isVerySmall ? '8px' : isMobile ? '12px' : '20px' 
-            }}>
-              Seleziona una categoria
-            </h3>
-            
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: getGridColumns(),
-              gap: isVerySmall ? '6px' : isMobile ? '8px' : isDesktop ? '24px' : '16px',
-              width: '100%'
+              padding: isVerySmall ? '8px 6px' : isMobile ? '12px 10px' : '16px 14px',
+              paddingBottom: isVerySmall ? '40px' : isMobile ? '60px' : '80px'
             }}>
-              {filteredCategories.map((category) => (
-                <motion.div
-                  key={category.id}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleSelectCategory(category)}
-                  style={{
-                    backgroundColor: theme.card,
-                    borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
-                    padding: isVerySmall ? '8px 2px' : isMobile ? '12px 4px' : '20px 8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: isVerySmall ? '4px' : isMobile ? '8px' : '12px',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-                    border: `1px solid ${theme.card}`,
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <div style={{ 
-                    fontSize: isVerySmall ? '20px' : isMobile ? '28px' : '36px',
-                    width: isVerySmall ? '28px' : isMobile ? '40px' : '60px',
-                    height: isVerySmall ? '28px' : isMobile ? '40px' : '60px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: `${category.color}15`,
-                    borderRadius: '50%'
-                  }}>
-                    {category.icon}
-                  </div>
-                  <span style={{ 
-                    fontSize: isVerySmall ? '10px' : isMobile ? '12px' : '16px', 
-                    fontWeight: '500',
-                    color: theme.text,
-                    textAlign: 'center',
-                    lineHeight: '1.2',
-                    // Truncate text if too long for small screens
-                    width: '100%',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: isVerySmall ? '-webkit-box' : 'block',
-                    WebkitLineClamp: isVerySmall ? 2 : 'unset',
-                    WebkitBoxOrient: isVerySmall ? 'vertical' : 'unset'
-                  }}>
-                    {category.name}
-                  </span>
-                </motion.div>
-              ))}
+              <h3 style={{ 
+                fontSize: isVerySmall ? '13px' : isMobile ? '15px' : '17px', 
+                fontWeight: '600', 
+                color: theme.text,
+                marginBottom: isVerySmall ? '6px' : isMobile ? '10px' : '16px' 
+              }}>
+                Seleziona una categoria
+              </h3>
+              
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: getGridColumns(),
+                gap: isVerySmall ? '4px' : isMobile ? '6px' : isDesktop ? '14px' : '10px',
+                width: '100%'
+              }}>
+                {filteredCategories.map((category) => (
+                  <motion.div
+                    key={category.id}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => handleSelectCategory(category)}
+                    style={{
+                      backgroundColor: theme.card,
+                      borderRadius: isVerySmall ? '6px' : isMobile ? '8px' : '12px',
+                      padding: isVerySmall ? '6px 2px' : isMobile ? '8px 3px' : '12px 4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: isVerySmall ? '2px' : isMobile ? '4px' : '6px',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+                      border: `1px solid ${theme.border}`,
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div style={{ 
+                      fontSize: isVerySmall ? '16px' : isMobile ? '20px' : '24px',
+                      width: isVerySmall ? '22px' : isMobile ? '28px' : '36px',
+                      height: isVerySmall ? '22px' : isMobile ? '28px' : '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: `${category.color}15`,
+                      borderRadius: '50%'
+                    }}>
+                      {category.icon}
+                    </div>
+                    <span style={{ 
+                      fontSize: isVerySmall ? '9px' : isMobile ? '10px' : '12px', 
+                      fontWeight: '500',
+                      color: theme.text,
+                      textAlign: 'center',
+                      lineHeight: '1.1',
+                      width: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical'
+                    }}>
+                      {category.name}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </motion.div>
         )}
@@ -401,136 +408,144 @@ const TransactionFormFullscreen = ({ isOpen, onClose, initialType, onSave }) => 
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch'
+            }}
+          >
+            <div style={{
               padding: isVerySmall ? '12px 8px' : isMobile ? '16px 12px' : isDesktop ? '32px 24px' : '24px 16px',
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
               gap: isVerySmall ? '16px' : isMobile ? '24px' : '32px',
-              overflowY: 'auto',
               maxWidth: isDesktop ? '800px' : '100%',
-              margin: isDesktop ? '0 auto' : '0'
-            }}
-          >
-            {/* Categoria selezionata */}
-            <div style={{ 
-              display: 'flex',
-              alignItems: 'center',
-              gap: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
-              padding: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
-              backgroundColor: `${selectedCategory.color}10`,
-              borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
-              border: `1px solid ${selectedCategory.color}30`
+              margin: isDesktop ? '0 auto' : '0',
+              width: '100%'
             }}>
-              <div style={{
-                fontSize: isVerySmall ? '20px' : isMobile ? '28px' : '36px',
-                width: isVerySmall ? '36px' : isMobile ? '48px' : '64px',
-                height: isVerySmall ? '36px' : isMobile ? '48px' : '64px',
+              {/* Categoria selezionata */}
+              <div style={{ 
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: `${selectedCategory.color}20`,
-                borderRadius: '50%'
-              }}>
-                {selectedCategory.icon}
-              </div>
-              <div>
-                <p style={{ 
-                  fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px', 
-                  color: theme.textSecondary 
-                }}>
-                  Categoria selezionata
-                </p>
-                <p style={{ 
-                  fontSize: isVerySmall ? '16px' : isMobile ? '18px' : '20px', 
-                  fontWeight: '600',
-                  color: theme.text
-                }}>
-                  {selectedCategory.name}
-                </p>
-              </div>
-            </div>
-            
-            {/* Importo */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
-                fontWeight: '600',
-                color: theme.text,
-                marginBottom: isVerySmall ? '6px' : isMobile ? '8px' : '12px'
-              }}>
-                Importo
-              </label>
-              
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: theme.card,
+                gap: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                padding: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                backgroundColor: `${selectedCategory.color}10`,
                 borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
-                padding: isVerySmall ? '12px 8px' : isMobile ? '16px 12px' : '24px 20px',
-                gap: isVerySmall ? '6px' : isMobile ? '8px' : '12px',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+                border: `1px solid ${selectedCategory.color}30`
               }}>
-                <span style={{
-                  fontSize: isVerySmall ? '28px' : isMobile ? '32px' : '40px',
-                  fontWeight: '700',
-                  color: transactionType === 'expense' ? theme.danger : theme.secondary
+                <div style={{
+                  fontSize: isVerySmall ? '20px' : isMobile ? '28px' : '36px',
+                  width: isVerySmall ? '36px' : isMobile ? '48px' : '64px',
+                  height: isVerySmall ? '36px' : isMobile ? '48px' : '64px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: `${selectedCategory.color}20`,
+                  borderRadius: '50%'
                 }}>
-                  €
-                </span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={formatAmount(amount)}
-                  onChange={(e) => {
-                    // Estrai solo i numeri e gestisci l'input come centesimi
-                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    setAmount(numericValue);
-                  }}
-                  placeholder="0,00"
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    outline: 'none',
+                  {selectedCategory.icon}
+                </div>
+                <div>
+                  <p style={{ 
+                    fontSize: isVerySmall ? '12px' : isMobile ? '14px' : '16px', 
+                    color: theme.textSecondary 
+                  }}>
+                    Categoria selezionata
+                  </p>
+                  <p style={{ 
+                    fontSize: isVerySmall ? '16px' : isMobile ? '18px' : '20px', 
+                    fontWeight: '600',
+                    color: theme.text
+                  }}>
+                    {selectedCategory.name}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Importo */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+                  fontWeight: '600',
+                  color: theme.text,
+                  marginBottom: isVerySmall ? '6px' : isMobile ? '8px' : '12px'
+                }}>
+                  Importo
+                </label>
+                
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: theme.card,
+                  borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                  padding: isVerySmall ? '12px 8px' : isMobile ? '16px 12px' : '24px 20px',
+                  gap: isVerySmall ? '6px' : isMobile ? '8px' : '12px',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+                }}>
+                  <span style={{
                     fontSize: isVerySmall ? '28px' : isMobile ? '32px' : '40px',
                     fontWeight: '700',
+                    color: transactionType === 'expense' ? theme.danger : theme.secondary
+                  }}>
+                    €
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatAmount(amount)}
+                    onChange={(e) => {
+                      // Estrai solo i numeri e gestisci l'input come centesimi
+                      const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                      setAmount(numericValue);
+                    }}
+                    placeholder="0,00"
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: isVerySmall ? '28px' : isMobile ? '32px' : '40px',
+                      fontWeight: '700',
+                      color: theme.text,
+                      width: '100%'
+                    }}
+                    autoFocus
+                  />
+                </div>
+              </div>
+              
+              {/* Descrizione */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
+                  fontWeight: '600',
+                  color: theme.text,
+                  marginBottom: isVerySmall ? '6px' : isMobile ? '8px' : '12px'
+                }}>
+                  Descrizione
+                </label>
+                
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={transactionType === 'expense' ? "Cosa hai comprato?" : "Da dove arriva?"}
+                  style={{
+                    width: '100%',
+                    padding: isVerySmall ? '12px' : isMobile ? '16px' : '20px',
+                    borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
+                    backgroundColor: theme.card,
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
                     color: theme.text,
-                    width: '100%'
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
                   }}
-                  autoFocus
                 />
               </div>
-            </div>
-            
-            {/* Descrizione */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
-                fontWeight: '600',
-                color: theme.text,
-                marginBottom: isVerySmall ? '6px' : isMobile ? '8px' : '12px'
-              }}>
-                Descrizione
-              </label>
-              
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={transactionType === 'expense' ? "Cosa hai comprato?" : "Da dove arriva?"}
-                style={{
-                  width: '100%',
-                  padding: isVerySmall ? '12px' : isMobile ? '16px' : '20px',
-                  borderRadius: isVerySmall ? '8px' : isMobile ? '12px' : '16px',
-                  backgroundColor: theme.card,
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: isVerySmall ? '14px' : isMobile ? '16px' : '18px',
-                  color: theme.text,
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-                }}
-              />
             </div>
           </motion.div>
         )}
@@ -562,6 +577,7 @@ const Dashboard = () => {
   // Stati per il budget e animazioni
   const dailyBudget = calculateDailyBudget();
   const [budgetSurplus, setBudgetSurplus] = useState(getBudgetSurplus());
+  const [currentDate, setCurrentDate] = useState(new Date().toDateString());
   
   // Stato per l'animazione delle transazioni
   const [lastTransaction, setLastTransaction] = useState(null);
@@ -572,6 +588,47 @@ const Dashboard = () => {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [transactionType, setTransactionType] = useState('expense');
   const [showQuickActions, setShowQuickActions] = useState(false);
+
+  // Aggiungi un useEffect per controllare il cambio di data e aggiornare il budget
+  useEffect(() => {
+    const checkDateChange = () => {
+      const now = new Date().toDateString();
+      if (now !== currentDate) {
+        // La data è cambiata, aggiorna il budget
+        setCurrentDate(now);
+        setBudgetSurplus(getBudgetSurplus());
+      }
+    };
+
+    // Controlla ogni minuto se la data è cambiata
+    const interval = setInterval(checkDateChange, 60000);
+
+    // Controlla anche al focus della finestra
+    const handleFocus = () => {
+      checkDateChange();
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [currentDate, getBudgetSurplus]);
+
+  // Aggiorna il budget quando cambiano le dipendenze principali
+  useEffect(() => {
+    setBudgetSurplus(getBudgetSurplus());
+  }, [
+    transactions, 
+    calculateDailyBudget, 
+    monthlyIncome, 
+    fixedExpenses, 
+    savingsPercentage,
+    customStartDate,
+    customEndDate,
+    paymentType
+  ]);
 
   // Impedisci lo scorrimento quando la pagina è attiva
   useEffect(() => {
