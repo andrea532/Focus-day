@@ -184,18 +184,27 @@ export const AppProvider = ({ children }) => {
     userSettings, streak, achievements, isLoading
   ]);
 
-  // Calcola il totale giornaliero delle spese future da sottrarre
+  // FUNZIONE CORRETTA: Calcola il totale giornaliero delle spese future da sottrarre
   const getDailyFutureExpenses = () => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Calcola l'accantonamento per TUTTE le spese future attive
     return futureExpenses.reduce((total, expense) => {
-      const dueDate = new Date(expense.dueDate);
-      const diffTime = dueDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const dueDate = new Date(expense.dueDate + 'T00:00:00');
       
-      if (diffDays > 0) {
-        const dailyAmount = expense.amount / diffDays;
-        return total + dailyAmount;
+      // Se la spesa è futura (non ancora scaduta)
+      if (dueDate > today) {
+        const diffTime = dueDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 0) {
+          const dailyAmount = expense.amount / diffDays;
+          console.log(`Spesa futura: ${expense.name}, Scadenza: ${expense.dueDate}, Giorni: ${diffDays}, Accantonamento giornaliero: €${dailyAmount.toFixed(2)}`);
+          return total + dailyAmount;
+        }
       }
+      
       return total;
     }, 0);
   };
@@ -270,7 +279,7 @@ export const AppProvider = ({ children }) => {
     return 0; // Fuori dal periodo di risparmio
   };
 
-  // FUNZIONE AGGIORNATA: Calcola il budget giornaliero
+  // FUNZIONE CORRETTA: Calcola il budget giornaliero includendo spese future
   const calculateDailyBudget = () => {
     // Gestione automatica ripetizione periodo
     const checkAndUpdatePeriod = () => {
@@ -361,38 +370,76 @@ export const AppProvider = ({ children }) => {
     const daysInPeriod = getDaysInPaymentPeriod();
     const dailyIncome = monthlyIncome / daysInPeriod;
     
-    const dailyBudget = dailyIncome - dailyFixedExpenses - dailySavings;
+    // IMPORTANTE: Includi l'accantonamento per spese future nel calcolo
     const dailyFutureExpenses = getDailyFutureExpenses();
-    const finalBudget = dailyBudget - dailyFutureExpenses;
     
-    return finalBudget > 0 ? finalBudget : 0;
+    // Calcola il budget finale
+    const dailyBudget = dailyIncome - dailyFixedExpenses - dailySavings - dailyFutureExpenses;
+    
+    // Log per debug
+    console.log('Daily Budget Calculation:', {
+      dailyIncome: dailyIncome.toFixed(2),
+      dailyFixedExpenses: dailyFixedExpenses.toFixed(2),
+      dailySavings: dailySavings.toFixed(2),
+      dailyFutureExpenses: dailyFutureExpenses.toFixed(2),
+      finalBudget: dailyBudget.toFixed(2),
+      date: new Date().toISOString()
+    });
+    
+    return dailyBudget;
   };
 
   const getTodayExpenses = () => {
-    const today = new Date().toDateString();
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
     return transactions
-      .filter(transaction => new Date(transaction.date).toDateString() === today && transaction.type === 'expense')
+      .filter(transaction => {
+        const transactionDate = new Date(transaction.date);
+        const transactionStr = transactionDate.toISOString().split('T')[0];
+        return transactionStr === todayStr && transaction.type === 'expense';
+      })
       .reduce((sum, transaction) => sum + transaction.amount, 0);
   };
 
   const getTodayIncome = () => {
-    const today = new Date().toDateString();
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
     return transactions
-      .filter(transaction => new Date(transaction.date).toDateString() === today && transaction.type === 'income')
+      .filter(transaction => {
+        const transactionDate = new Date(transaction.date);
+        const transactionStr = transactionDate.toISOString().split('T')[0];
+        return transactionStr === todayStr && transaction.type === 'income';
+      })
       .reduce((sum, transaction) => sum + transaction.amount, 0);
   };
 
   const getBudgetSurplus = () => {
+    // IMPORTANTE: Forza il ricalcolo del budget giornaliero (che include spese future)
     const dailyBudget = calculateDailyBudget();
     const todayExpenses = getTodayExpenses();
     const todayIncome = getTodayIncome();
-    return dailyBudget - todayExpenses + todayIncome;
+    
+    const surplus = dailyBudget - todayExpenses + todayIncome;
+    
+    // Log per debug
+    console.log('Budget Surplus Calculation:', {
+      dailyBudget: dailyBudget.toFixed(2),
+      todayExpenses: todayExpenses.toFixed(2),
+      todayIncome: todayIncome.toFixed(2),
+      surplus: surplus.toFixed(2),
+      date: new Date().toISOString()
+    });
+    
+    return surplus;
   };
 
   const getMonthlyAvailability = () => {
     if (paymentType === 'custom' && customStartDate && customEndDate) {
       const isRepeating = localStorage.getItem('incomeRepeating') === 'true';
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const start = new Date(customStartDate);
       const end = new Date(customEndDate);
       
@@ -432,6 +479,14 @@ export const AppProvider = ({ children }) => {
         tempPeriodCurrent.setDate(tempPeriodCurrent.getDate() + 1);
       }
       
+      // Calcola giorni rimanenti nel periodo
+      let remainingDays = 0;
+      const tempToday = new Date(today);
+      while (tempToday <= currentPeriodEnd) {
+        remainingDays++;
+        tempToday.setDate(tempToday.getDate() + 1);
+      }
+      
       const dailyFixedExpenses = fixedExpenses.reduce((sum, expense) => {
         if (expense.customStartDate && expense.customEndDate) {
           const expStart = new Date(expense.customStartDate);
@@ -452,7 +507,24 @@ export const AppProvider = ({ children }) => {
       const totalFixedExpenses = dailyFixedExpenses * periodDays;
       const savingsAmount = getDailySavingsAmount() * periodDays;
       
-      return monthlyIncome - totalFixedExpenses - savingsAmount - periodExpenses;
+      // IMPORTANTE: Calcola l'accantonamento totale per spese future per i giorni rimanenti
+      const dailyFutureExpenses = getDailyFutureExpenses();
+      const totalFutureExpenses = dailyFutureExpenses * remainingDays;
+      
+      const availability = monthlyIncome - totalFixedExpenses - savingsAmount - periodExpenses - totalFutureExpenses;
+      
+      console.log('Monthly Availability Calculation:', {
+        monthlyIncome: monthlyIncome.toFixed(2),
+        totalFixedExpenses: totalFixedExpenses.toFixed(2),
+        savingsAmount: savingsAmount.toFixed(2),
+        periodExpenses: periodExpenses.toFixed(2),
+        dailyFutureExpenses: dailyFutureExpenses.toFixed(2),
+        remainingDays,
+        totalFutureExpenses: totalFutureExpenses.toFixed(2),
+        availability: availability.toFixed(2)
+      });
+      
+      return availability;
     }
     
     // Comportamento normale per pagamento mensile
@@ -492,8 +564,13 @@ export const AppProvider = ({ children }) => {
                tDate.getFullYear() === currentYear;
       })
       .reduce((sum, t) => sum + t.amount, 0);
+    
+    // IMPORTANTE: Includi le spese future nel calcolo mensile
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const remainingDaysInMonth = daysInMonth - new Date().getDate() + 1;
+    const monthlyFutureExpenses = getDailyFutureExpenses() * remainingDaysInMonth;
 
-    return monthlyIncome - totalFixedExpenses - monthlySavings - monthlyExpenses;
+    return monthlyIncome - totalFixedExpenses - monthlySavings - monthlyExpenses - monthlyFutureExpenses;
   };
 
   const getDaysUntilPayday = () => {

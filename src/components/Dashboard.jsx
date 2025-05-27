@@ -28,7 +28,7 @@ const BudgetIndicator = ({ day, amount }) => {
         fontSize: '20px',
         color: isPositive ? theme.secondary : theme.danger 
       }}>
-        € {Math.abs(amount).toFixed(2)}
+        {!isPositive && '-'}€ {Math.abs(amount).toFixed(2)}
       </span>
     </motion.div>
   );
@@ -559,7 +559,8 @@ const Dashboard = () => {
     theme, 
     categories, 
     calculateDailyBudget, 
-    getBudgetSurplus,
+    getTodayExpenses,
+    getTodayIncome,
     addTransaction,
     getDaysUntilPayday,
     nextPaydayDate,
@@ -574,10 +575,24 @@ const Dashboard = () => {
     customEndDate,
   } = useContext(AppContext);
 
+  // Funzione helper per verificare se è un nuovo giorno
+  const isNewDay = (lastDate) => {
+    const last = new Date(lastDate);
+    const today = new Date();
+    return last.toDateString() !== today.toDateString();
+  };
+
+  // Funzione per calcolare il budget surplus corrente
+  const calculateCurrentBudgetSurplus = () => {
+    const dailyBudget = calculateDailyBudget();
+    const todayExpenses = getTodayExpenses();
+    const todayIncome = getTodayIncome();
+    return dailyBudget - todayExpenses + todayIncome;
+  };
+
   // Stati per il budget e animazioni
-  const dailyBudget = calculateDailyBudget();
-  const [budgetSurplus, setBudgetSurplus] = useState(getBudgetSurplus());
-  const [currentDate, setCurrentDate] = useState(new Date().toDateString());
+  const [lastUpdatedDate, setLastUpdatedDate] = useState(new Date().toDateString());
+  const [budgetSurplus, setBudgetSurplus] = useState(calculateCurrentBudgetSurplus());
   
   // Stato per l'animazione delle transazioni
   const [lastTransaction, setLastTransaction] = useState(null);
@@ -589,39 +604,61 @@ const Dashboard = () => {
   const [transactionType, setTransactionType] = useState('expense');
   const [showQuickActions, setShowQuickActions] = useState(false);
 
-  // Aggiungi un useEffect per controllare il cambio di data e aggiornare il budget
+  // Determina se siamo in negativo
+  const isNegative = budgetSurplus < 0;
+
+  // Controlla se è un nuovo giorno all'avvio e quando l'app torna in primo piano
   useEffect(() => {
-    const checkDateChange = () => {
+    const checkAndUpdateBudget = () => {
       const now = new Date().toDateString();
-      if (now !== currentDate) {
-        // La data è cambiata, aggiorna il budget
-        setCurrentDate(now);
-        setBudgetSurplus(getBudgetSurplus());
+      
+      // Se è un nuovo giorno, ricalcola tutto
+      if (now !== lastUpdatedDate) {
+        console.log('Nuovo giorno rilevato, aggiornamento budget...');
+        setLastUpdatedDate(now);
+        const newBudget = calculateCurrentBudgetSurplus();
+        setBudgetSurplus(newBudget);
       }
     };
 
-    // Controlla ogni minuto se la data è cambiata
-    const interval = setInterval(checkDateChange, 60000);
+    // Controlla subito all'avvio
+    checkAndUpdateBudget();
 
-    // Controlla anche al focus della finestra
-    const handleFocus = () => {
-      checkDateChange();
+    // Controlla ogni minuto
+    const interval = setInterval(checkAndUpdateBudget, 60000);
+
+    // Controlla quando l'app torna in primo piano
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkAndUpdateBudget();
+      }
     };
 
+    const handleFocus = () => {
+      checkAndUpdateBudget();
+    };
+
+    // Aggiungi listener per visibility e focus
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
+    
+    // Aggiungi listener per quando la PWA viene riaperta
+    window.addEventListener('pageshow', checkAndUpdateBudget);
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', checkAndUpdateBudget);
     };
-  }, [currentDate, getBudgetSurplus]);
+  }, [lastUpdatedDate]);
 
   // Aggiorna il budget quando cambiano le dipendenze principali
   useEffect(() => {
-    setBudgetSurplus(getBudgetSurplus());
+    const newBudget = calculateCurrentBudgetSurplus();
+    setBudgetSurplus(newBudget);
   }, [
     transactions, 
-    calculateDailyBudget, 
     monthlyIncome, 
     fixedExpenses, 
     savingsPercentage,
@@ -632,25 +669,20 @@ const Dashboard = () => {
 
   // Impedisci lo scorrimento quando la pagina è attiva
   useEffect(() => {
-    // Salva lo stile originale per ripristinarlo in seguito
     const originalStyle = window.getComputedStyle(document.body).overflow;
     
-    // Funzione per prevenire lo scorrimento
     const preventDefault = (e) => {
       e.preventDefault();
     };
     
-    // Applica stile per impedire lo scorrimento
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.width = '100%';
     document.body.style.height = '100%';
     
-    // Aggiungi listener per prevenire eventi di scorrimento
     document.addEventListener('wheel', preventDefault, { passive: false });
     document.addEventListener('touchmove', preventDefault, { passive: false });
     
-    // Cleanup quando il componente viene smontato
     return () => {
       document.body.style.overflow = originalStyle;
       document.body.style.position = '';
@@ -662,6 +694,7 @@ const Dashboard = () => {
   }, []);
   
   // Calcolo budget per i prossimi giorni
+  const dailyBudget = calculateDailyBudget();
   const tomorrowBudget = dailyBudget + budgetSurplus;
   const afterTomorrowBudget = tomorrowBudget + dailyBudget;
 
@@ -694,7 +727,6 @@ const Dashboard = () => {
     const totalFixedExpenses = fixedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     const savingsAmount = (monthlyIncome * savingsPercentage) / 100;
     
-    // Se abbiamo un periodo personalizzato, calcola in base a quello
     const isRepeating = localStorage.getItem('incomeRepeating') === 'true';
     
     if (paymentType === 'custom' && customStartDate && customEndDate) {
@@ -702,7 +734,6 @@ const Dashboard = () => {
       const start = new Date(customStartDate);
       const end = new Date(customEndDate);
       
-      // Calcola il periodo corrente se c'è ripetizione
       let currentPeriodStart = start;
       let currentPeriodEnd = end;
       
@@ -717,7 +748,6 @@ const Dashboard = () => {
         currentPeriodEnd.setDate(currentPeriodEnd.getDate() + (periodDays * periodsToAdd));
       }
       
-      // Filtra le transazioni del periodo corrente
       const periodExpenses = transactions
         .filter(t => {
           const tDate = new Date(t.date);
@@ -739,7 +769,6 @@ const Dashboard = () => {
       return monthlyIncome + periodIncome - totalFixedExpenses - savingsAmount - periodExpenses;
     }
     
-    // Comportamento normale per periodi mensili
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
@@ -769,7 +798,6 @@ const Dashboard = () => {
 
   // Gestione transazioni
   const handleAddTransaction = (transaction) => {
-    // Crea la transazione da aggiungere
     const finalTransaction = {
       amount: transaction.amount,
       categoryId: transaction.categoryId,
@@ -778,36 +806,27 @@ const Dashboard = () => {
       type: transaction.type
     };
     
-    // Aggiorna il budget surplus in base alla transazione
     const updatedBudget = transaction.type === 'expense' 
       ? budgetSurplus - transaction.amount 
       : budgetSurplus + transaction.amount;
     
-    // Salva la transazione corrente per l'animazione
     setLastTransaction({
       amount: transaction.amount,
       type: transaction.type,
       category: categories.find(c => c.id === transaction.categoryId)
     });
     
-    // Mostra l'effetto della transazione
     setShowTransactionEffect(true);
     
-    // Aggiorna il budget dopo un breve ritardo
     setTimeout(() => {
-      // Aggiungi la transazione effettiva
       addTransaction(finalTransaction);
-      
-      // Aggiorna il budget nella UI
       setBudgetSurplus(updatedBudget);
       
-      // Nascondi l'effetto dopo l'aggiornamento
       setTimeout(() => {
         setShowTransactionEffect(false);
       }, 1500);
     }, 300);
 
-    // Chiudi il form
     setShowTransactionForm(false);
     setShowQuickActions(false);
   };
@@ -826,10 +845,11 @@ const Dashboard = () => {
       animate={{ opacity: 1 }}
       style={{ 
         padding: '16px 16px 80px 16px',
-        backgroundColor: theme.background,
+        backgroundColor: isNegative ? '#FFEBEE' : theme.background,
         height: '100vh',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        transition: 'background-color 0.5s ease'
       }}
     >
       {/* Savings Overlay */}
@@ -875,7 +895,7 @@ const Dashboard = () => {
               fontWeight: '700', 
               color: monthlyBalance >= 0 ? theme.secondary : theme.danger 
             }}>
-              € {monthlyBalance.toFixed(2)}
+              {monthlyBalance < 0 && '-'}€ {Math.abs(monthlyBalance).toFixed(2)}
             </p>
           </div>
           
@@ -928,7 +948,7 @@ const Dashboard = () => {
           marginBottom: '8px',
           position: 'relative'
         }}>
-          {budgetSurplus >= 0 ? '' : '-'}€ {Math.abs(budgetSurplus).toFixed(2)}
+          {budgetSurplus < 0 ? '-' : ''}€ {Math.abs(budgetSurplus).toFixed(2)}
           
           {/* Animazione di transazione */}
           <AnimatePresence>
@@ -980,6 +1000,22 @@ const Dashboard = () => {
             )}
           </AnimatePresence>
         </div>
+        
+        {/* Messaggio di avviso se in negativo */}
+        {isNegative && (
+          <motion.p
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              fontSize: '14px',
+              color: theme.danger,
+              fontWeight: '500',
+              marginTop: '8px'
+            }}
+          >
+            ⚠️ Attenzione: hai superato il budget!
+          </motion.p>
+        )}
       </motion.div>
 
       {/* Budget Indicators - in orizzontale senza bordi, posizionati in basso */}

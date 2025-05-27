@@ -1,10 +1,9 @@
-import React, { useContext, useEffect, useState, useMemo } from 'react';
+import React, { useContext, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PieChart,
   BarChart3,
   TrendingUp,
-  Trophy,
   Calendar,
   ArrowUp,
   ArrowDown,
@@ -28,9 +27,6 @@ const StatsPage = () => {
     transactions,
     getMonthlyStats,
     getWeeklyComparison,
-    streak,
-    achievements,
-    setAchievements,
     setCurrentView,
   } = useContext(AppContext);
 
@@ -223,18 +219,6 @@ const StatsPage = () => {
 
   const categoryStats = getCategoryStats();
 
-  // Achievement non visti
-  const unseenAchievements = achievements.filter((a) => !a.seen);
-
-  useEffect(() => {
-    if (unseenAchievements.length > 0) {
-      const timer = setTimeout(() => {
-        setAchievements((prev) => prev.map((a) => ({ ...a, seen: true })));
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [unseenAchievements, setAchievements]);
-
   // Ottieni l'icona della categoria
   const getCategoryDisplay = (categoryId) => {
     const category = categories.find(c => c.id === categoryId);
@@ -301,57 +285,6 @@ const StatsPage = () => {
           ))}
         </div>
       </motion.div>
-
-      {/* Achievement Notifications */}
-      <AnimatePresence>
-        {unseenAchievements.length > 0 && (
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            style={{
-              margin: '16px',
-              padding: '16px',
-              borderRadius: '16px',
-              backgroundColor: `${theme.warning}20`,
-              border: `1px solid ${theme.warning}`,
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            <motion.div
-              animate={{
-                x: [0, 100, 0],
-                opacity: [0.3, 0.5, 0.3],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: 'linear',
-              }}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '-100px',
-                width: '100px',
-                height: '100%',
-                background: `linear-gradient(90deg, transparent, ${theme.warning}40, transparent)`,
-              }}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Trophy size={24} style={{ color: theme.warning }} />
-              <div>
-                <p style={{ fontWeight: '600', color: theme.text }}>
-                  Nuovo Achievement!
-                </p>
-                <p style={{ fontSize: '14px', color: theme.textSecondary }}>
-                  {unseenAchievements[0].title}
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <motion.div
         variants={containerVariants}
@@ -909,145 +842,7 @@ const StatsPage = () => {
           )}
         </motion.div>
 
-        {/* Achievements e Streak */}
-        <motion.div
-          variants={itemVariants}
-          style={{
-            padding: '24px',
-            borderRadius: '24px',
-            backgroundColor: theme.card,
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-          }}
-        >
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '24px',
-          }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', color: theme.text }}>
-              Progressi e Achievements
-            </h3>
-            <Trophy size={20} style={{ color: theme.warning }} />
-          </div>
 
-          {/* Streak Card */}
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            style={{
-              padding: '24px',
-              borderRadius: '16px',
-              background: `linear-gradient(135deg, ${theme.primary} 0%, #5A85FF 100%)`,
-              marginBottom: '20px',
-              textAlign: 'center',
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            <motion.div
-              animate={{
-                scale: [1, 1.5, 1],
-                opacity: [0.1, 0.3, 0.1],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'radial-gradient(circle, white 0%, transparent 70%)',
-              }}
-            />
-
-            <Calendar
-              size={32}
-              style={{ color: 'white', margin: '0 auto 12px' }}
-            />
-            <p style={{ color: 'white', fontSize: '14px', marginBottom: '8px' }}>
-              Streak Attuale
-            </p>
-            <motion.p
-              key={streak}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              style={{
-                color: 'white',
-                fontSize: '36px',
-                fontWeight: '700',
-                marginBottom: '8px',
-              }}
-            >
-              {streak}
-            </motion.p>
-            <p style={{ color: 'white', fontSize: '14px', opacity: 0.9 }}>
-              giorni consecutivi sotto budget
-            </p>
-          </motion.div>
-
-          {/* Recent Achievements */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {achievements.length > 0 ? (
-              achievements
-                .slice(-3)
-                .reverse()
-                .map((achievement, index) => (
-                  <motion.div
-                    key={achievement.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ scale: 1.02 }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '16px',
-                      borderRadius: '12px',
-                      backgroundColor: theme.background,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        backgroundColor: `${theme.warning}20`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Trophy size={20} style={{ color: theme.warning }} />
-                    </div>
-                    <div>
-                      <p style={{ fontWeight: '500', color: theme.text }}>
-                        {achievement.title}
-                      </p>
-                      <p style={{ fontSize: '12px', color: theme.textSecondary }}>
-                        {new Date(achievement.date).toLocaleDateString('it-IT')}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))
-            ) : (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                style={{
-                  textAlign: 'center',
-                  fontSize: '14px',
-                  color: theme.textSecondary,
-                  padding: '32px 0',
-                }}
-              >
-                Completa obiettivi per sbloccare achievements!
-              </motion.p>
-            )}
-          </div>
-        </motion.div>
       </motion.div>
     </motion.div>
   );

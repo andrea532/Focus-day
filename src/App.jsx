@@ -91,7 +91,7 @@ const AppContent = () => {
     setTimeout(checkOnboarding, 100);
   }, []);
 
-  // Registra il service worker
+  // Registra il service worker e gestisce i messaggi
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/pwabuilder-sw.js')
@@ -112,7 +112,58 @@ const AppContent = () => {
         .catch(error => {
           console.error('Errore durante la registrazione del Service Worker:', error);
         });
+
+      // Ascolta i messaggi dal service worker
+      navigator.serviceWorker.addEventListener('message', event => {
+        console.log('Messaggio dal service worker:', event.data);
+        
+        if (event.data && event.data.type === 'NEW_DAY') {
+          console.log('Nuovo giorno rilevato, ricarico la pagina...');
+          // Ricarica la pagina per aggiornare tutti i dati
+          window.location.reload();
+        }
+      });
     }
+  }, []);
+
+  // Gestisce gli eventi di visibilità della pagina per PWA
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('App tornata in primo piano, controllo aggiornamenti...');
+        
+        // Controlla se è un nuovo giorno
+        const lastCheck = localStorage.getItem('lastDayCheck');
+        const today = new Date().toDateString();
+        
+        if (lastCheck !== today) {
+          console.log('Nuovo giorno rilevato, aggiorno...');
+          localStorage.setItem('lastDayCheck', today);
+          
+          // Forza un aggiornamento dell'app
+          window.location.reload();
+        }
+      }
+    };
+
+    const handlePageShow = (event) => {
+      if (event.persisted) {
+        console.log('Pagina ripristinata dalla cache, controllo aggiornamenti...');
+        handleVisibilityChange();
+      }
+    };
+
+    // Aggiungi listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pageshow', handlePageShow);
+
+    // Salva il giorno corrente al primo caricamento
+    localStorage.setItem('lastDayCheck', new Date().toDateString());
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
   }, []);
 
   // Funzione per gestire il completamento dell'onboarding

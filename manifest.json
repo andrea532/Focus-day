@@ -1,62 +1,24 @@
 {
-  "name": "Daily Budget Manager - Gestione Finanze Personali",
+  "name": "Budget App - Gestione Finanze Personali",
   "short_name": "Budget App",
-  "description": "Gestisci il tuo budget giornaliero in modo semplice ed efficace. Traccia spese, entrate e risparmi anche offline.",
+  "description": "App per la gestione del budget giornaliero e delle finanze personali",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#121218",
   "theme_color": "#4C6FFF",
+  "background_color": "#F8FAFF",
   "orientation": "portrait",
-  "categories": ["finance", "productivity", "utilities"],
   "lang": "it-IT",
   "dir": "ltr",
-  "prefer_related_applications": false,
-  "scope": "/",
+  "categories": ["finance", "productivity", "lifestyle"],
   "icons": [
     {
-      "src": "/icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-192x192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-512x512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -64,64 +26,51 @@
   ],
   "screenshots": [
     {
-      "src": "/screenshots/screenshot1.png",
-      "sizes": "1125x2436",
+      "src": "/screenshot1.png",
+      "sizes": "1170x2532",
       "type": "image/png",
       "label": "Dashboard principale"
     },
     {
-      "src": "/screenshots/screenshot2.png",
-      "sizes": "1125x2436",
+      "src": "/screenshot2.png",
+      "sizes": "1170x2532",
       "type": "image/png",
       "label": "Cronologia transazioni"
-    },
-    {
-      "src": "/screenshots/screenshot3.png",
-      "sizes": "1125x2436",
-      "type": "image/png",
-      "label": "Statistiche e grafici"
     }
   ],
+  "related_applications": [],
+  "prefer_related_applications": false,
   "shortcuts": [
     {
       "name": "Aggiungi Spesa",
       "short_name": "Spesa",
       "description": "Aggiungi rapidamente una nuova spesa",
-      "url": "/?action=add-expense",
-      "icons": [{ "src": "/icons/expense-shortcut.png", "sizes": "192x192" }]
+      "url": "/?action=expense",
+      "icons": [
+        {
+          "src": "/icon-expense.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Aggiungi Entrata",
       "short_name": "Entrata",
       "description": "Aggiungi rapidamente una nuova entrata",
-      "url": "/?action=add-income",
-      "icons": [{ "src": "/icons/income-shortcut.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Statistiche",
-      "short_name": "Stats",
-      "description": "Visualizza le tue statistiche finanziarie",
-      "url": "/?view=stats",
-      "icons": [{ "src": "/icons/stats-shortcut.png", "sizes": "192x192" }]
+      "url": "/?action=income",
+      "icons": [
+        {
+          "src": "/icon-income.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     }
   ],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
+  "launch_handler": {
+    "client_mode": "focus-existing"
   },
-  "features": [
-    "Cross Platform",
-    "Offline Support",
-    "Fast",
-    "Installable"
-  ],
-  "edge_side_panel": {
-    "preferred_width": 400
-  }
+  "scope": "/",
+  "id": "budget-app-v1"
 }
